@@ -296,8 +296,8 @@ class ProgAssembler(BaseAssembler):
                 'sge': 'jsge', 's>=': 'jsge', 'p': 'jsge', # difference Positive
                 'lt': 'jlt', '<': 'jlt',
                 'le': 'jle', '<=': 'jle',
-                'slt': 'jslt', 's<': 'jslt',
-                'sle': 'jsle', 's<=': 'jsle', 'n': 'jsle'} # difference Negative
+                'slt': 'jslt', 's<': 'jslt', 'n': 'jslt', # difference Negative
+                'sle': 'jsle', 's<=': 'jsle',}
 
     def parse_jrcc(self, op, args):
         cc = args[0]
