@@ -1,4 +1,5 @@
 #!/usr/bin/python2
+# Copyright (c) 2017 Solarflare Communications Ltd
 
 import re
 import struct

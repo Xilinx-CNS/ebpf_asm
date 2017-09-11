@@ -1,5 +1,6 @@
 ; dropper.s
 ; simple IP-based XDP drop program
+; Copyright (c) 2017 Solarflare Communications Ltd
 
 .include defs.i
 .include net_hdrs.i
