@@ -738,8 +738,10 @@ class Assembler(BaseAssembler):
             raise Exception("No such directive", '.' + d)
     def do_text(self, args):
         self.sectype = ProgAssembler
+        self.section = None
     def do_data(self, args):
         self.sectype = DataAssembler
+        self.section = None
     def do_section(self, args):
         if len(args) != 1:
             raise Exception("Bad .section, expected 1 arg, got", args)
@@ -750,7 +752,14 @@ class Assembler(BaseAssembler):
             raise Exception("Must specify .text or .data before .section")
         else:
             asm = self.sectype(self.equates)
-        self.sections[name] = asm
+        if name in self.sections:
+            if not isinstance(self.sections[name], asm.__class__):
+                raise Exception("Section", name, "redefined as different type",
+                                asm.__class__.__name__, "previously",
+                                self.sections[name].__class__.__name__)
+            # throw away our new asm, use the existing one
+        else:
+            self.sections[name] = asm
         self.section = name
     def do_include(self, args):
         if len(args) != 1:
