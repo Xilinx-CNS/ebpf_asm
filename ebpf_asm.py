@@ -463,7 +463,7 @@ class ProgAssembler(BaseAssembler):
         else:
             raise Exception("Bad size", size, "for ALU op", insn['line'])
         if dst.get('imm') is not None:
-            raise Exception("neg imm,... illegal", insn['line'])
+            raise Exception("neg imm illegal", insn['line'])
         return {'class': klass, 'op': 'neg', 'dst': dst['reg'], 'src': 0}
 
     def generate_jr(self, insn):
@@ -499,7 +499,7 @@ class ProgAssembler(BaseAssembler):
             raise Exception("xadd [imm],... illegal", insn['line'])
         if src.get('reg') is None:
             raise Exception("xadd ...,imm illegal", insn['line'])
-        return {'class': 'stx', 'mode': xadd, 'size': insn.get('size', 'q'),
+        return {'class': 'stx', 'mode': 'xadd', 'size': insn.get('size', 'q'),
                 'dst': dst['reg'], 'src': src['reg'], 'off': dst.get('off', 0)}
 
     op_generators = {'ld': generate_ld, 'add': generate_alu,
