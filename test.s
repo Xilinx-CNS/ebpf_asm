@@ -16,6 +16,7 @@
 	jr	+6
 	jr	nz, r0, r1, +6
 	jr	>=, r0, 14, +6
+	xadd [r0], r1
 foo:
 	call	bpf_map_update_elem
 	exit
