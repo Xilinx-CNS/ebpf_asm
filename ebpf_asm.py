@@ -496,13 +496,20 @@ class ProgAssembler(BaseAssembler):
     def generate_xadd(self, insn):
         dst = insn['dst']
         src = insn['src']
+        size = src.get('size', dst.get('size'))
+        if 'size' in src and 'size' in dst:
+            # Normally we don't specify both.  But if we do, they must match
+            if size != dst['size']:
+                raise Exception("Mismatched sizes", insn['line'])
         if not dst.get('ind'):
             raise Exception("xadd direct_operand,... illegal", insn['line'])
         if dst.get('reg') is None:
             raise Exception("xadd [imm],... illegal", insn['line'])
         if src.get('reg') is None:
             raise Exception("xadd ...,imm illegal", insn['line'])
-        return {'class': 'stx', 'mode': 'xadd', 'size': insn.get('size', 'q'),
+        if size is None:
+            size = 'q'
+        return {'class': 'stx', 'mode': 'xadd', 'size': size,
                 'dst': dst['reg'], 'src': src['reg'], 'off': dst.get('off', 0)}
 
     op_generators = {'ld': generate_ld, 'add': generate_alu,
