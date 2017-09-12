@@ -6,6 +6,8 @@ import struct
 import ast
 import optparse
 
+VERSION = None
+
 """Input language for .section prog:
 
 Based on Intel syntax:
@@ -978,7 +980,8 @@ class ElfGenerator(object):
                            self.get_section('.strtab').idx)
 
 def parse_args():
-    x = optparse.OptionParser(usage='%s srcfile [...] -o outfile')
+    x = optparse.OptionParser(usage='%s srcfile [...] -o outfile',
+                              version='%prog ' + VERSION if VERSION else None)
     x.add_option('-o', '--output', type='string', default='a.out')
     opts, args = x.parse_args()
     if not args:
