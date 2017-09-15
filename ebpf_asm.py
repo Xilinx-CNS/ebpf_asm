@@ -68,7 +68,9 @@ ld      reg.sz, reg     ; alternate syntax for the above
 ld      reg.l, imm      ; only 32-bit (for 64-bit see LD|IMM)
 For BPF_NEG we can write:
 neg     reg.sz          ; sz must be 'q' or 'l'
-BPF_END isn't supported yet.
+For BPF_END we can write:
+end     be, reg.sz      ; sz must be 'q', 'l', or 'w'; 'q' assumed
+end     le, reg.sz      ; cpu to/from LE
 For the others, we use the lower-case name of the op and write e.g.
 add     reg, reg.sz     ; sz must be 'q' or 'l'
 add     reg.sz, reg     ; alternate syntax for the above
@@ -267,7 +269,13 @@ class ProgAssembler(BaseAssembler):
         return {'op': 'neg', 'dst': reg}
 
     def parse_end(self, op, args):
-        raise NotImplementedError()
+        """end dir, reg.sz"""
+        if len(args) != 2:
+            raise Exception("Bad end, expected 2 args, got", args)
+        if args[0] not in ('le', 'be'):
+            raise Exception("Bad end, expected le or be, got", args)
+        reg = self.parse_direct_operand(args[1])
+        return {'op': 'end', 'dir': args[0], 'dst': reg}
 
     def parse_offset(self, arg):
         if arg.startswith('+'):
@@ -469,6 +477,25 @@ class ProgAssembler(BaseAssembler):
             raise Exception("neg imm illegal", insn['line'])
         return {'class': klass, 'op': 'neg', 'dst': dst['reg'], 'src': 0}
 
+    def generate_end(self, insn):
+        dst = insn['dst']
+        size = dst.get('size', 'q')
+        imm = {'q': 64, 'l': 32, 'w': 16}.get(size)
+        if imm is None:
+            raise Exception("Bad size", size, "for endian op", insn['line'])
+        if dst.get('imm') is not None:
+            raise Exception("end ..., imm illegal", insn['line'])
+        dr = insn['dir']
+        # All BPF_END (even 64-bit) use (32-bit) BPF_ALU class
+        if dr == 'le': # BPF_TO_LE == BPF_K
+            return {'class': 'alu', 'op': 'end', 'dst': dst['reg'],
+                    'imm': imm}
+        if dr == 'be': # BPF_TO_BE == BPF_X, so use 'fake' src reg
+            return {'class': 'alu', 'op': 'end', 'dst': dst['reg'], 'src': 0,
+                    'imm': imm}
+        # can't happen, already checked in parse_end
+        raise Exception("Bad direction", dr, "for endian op", insn['line'])
+
     def generate_jr(self, insn):
         off = insn['off']
         cc = insn.get('cc')
@@ -518,7 +545,7 @@ class ProgAssembler(BaseAssembler):
                      'and': generate_alu, 'lsh': generate_alu,
                      'rsh': generate_alu, 'neg': generate_neg,
                      'mod': generate_alu, 'xor': generate_alu,
-                     'arsh': generate_alu, 'end': generate_alu,
+                     'arsh': generate_alu, 'end': generate_end,
                      'jr': generate_jr, 'call': generate_call,
                      'exit': generate_exit, 'xadd': generate_xadd,}
 
@@ -586,7 +613,8 @@ class ProgAssembler(BaseAssembler):
         if 'src' in insn: # ALU[64]_REG
             op = self.classes[insn['class']] | self.BPF_X | self.alu_ops[insn['op']]
             regs = (insn['src'] << 4) | insn['dst']
-            return (op, regs, 0, 0)
+            # Could still have an 'imm' in case of BPF_END | BPF_TO_BE
+            return (op, regs, 0, self.check_s32(insn.get('imm', 0)))
         # ALU[64]_IMM
         op = self.classes[insn['class']] | self.BPF_K | self.alu_ops[insn['op']]
         regs = insn['dst']

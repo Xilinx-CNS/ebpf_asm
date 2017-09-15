@@ -181,7 +181,14 @@ if omitted, quad (`.q`) is assumed.
 
 #### end
 
-The endianness-conversion opcode (BPF\_END) is not yet supported.
+`end le, dst_reg.sz`
+
+`end be, dst_reg.sz`
+
+Converts the specified register between Little or Big Endian and CPU endianness.
+Size must be one of quad (`.q`), long (`.l`) or word (`.w`); if omitted, quad
+(`.q`) is assumed.
+The same operation is used for conversions both from and to CPU endianness.
 
 ### Map definitions
 
