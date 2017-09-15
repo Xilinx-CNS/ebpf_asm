@@ -15,7 +15,8 @@
 	jr	ge, r3, r1, +1 ; Do we have the entire ether-hdr?
 	exit
 	ld	r4.w, [r2+ETHER_HDR_PROTO]
-	jr	z, r4, ETHERTYPE_IPV4_LE, +1 ; Is it IPv4?
+	end	be, r4.w
+	jr	z, r4, ETHERTYPE_IPV4, +1 ; Is it IPv4?
 	exit
 	ld	r2, r1 ; done with the ether-hdr
 	add	r1, IP_HDR__LEN
@@ -38,7 +39,7 @@ drop:
 	exit
 
 .section maps
-; ip.src => counter
+; __be32 ip.src => u32 counter
 dropcnt: percpu_hash, 4, 4, 1024, P
 .data
 .section license

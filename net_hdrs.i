@@ -7,8 +7,7 @@
 .equ	ETHER_HDR_PROTO, 12
 .equ	ETHER_HDR__LEN, 14
 
-;TODO: implement the BPF_END opcode in the assembler, so we can do this properly
-.equ	ETHERTYPE_IPV4_LE, 0x0008 ; IPv4 is 0x0800, but Ethertype is Big-Endian
+.equ	ETHERTYPE_IPV4, 0x0800
 
 ; IPv4
 .equ	IP_HDR_IHLVER, 0
