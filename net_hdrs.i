@@ -8,6 +8,12 @@
 .equ	ETHER_HDR__LEN, 14
 
 .equ	ETHERTYPE_IPV4, 0x0800
+.equ	ETHERTYPE_8021Q, 0x8100 ; really the 802.1q "TPID", but appears at the same offset as Ethertype
+
+; VLAN (802.1q) considered as coming _after_ the Ethertype (which is saner)
+.equ	VLAN_HDR_TCI, 0
+.equ	VLAN_HDR_INNER_PROTO, 2 ; Officially this is the Ethertype and where it should be is the TPID.  But that's needlessly confusing; treat it as though that the Ethertype is 0x8100, the VLAN header starts after that, and includes an 'inner-Ethertype' field.
+.equ	VLAN_HDR__LEN, 4
 
 ; IPv4
 .equ	IP_HDR_IHLVER, 0
