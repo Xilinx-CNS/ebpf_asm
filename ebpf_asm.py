@@ -107,9 +107,9 @@ class BaseAssembler(object):
     def __init__(self, equates):
         self.equates = equates
     _size_re = re.compile(r'\.([bwlq])$')
-    _octal_re = re.compile(r'0\d+$')
-    _decimal_re = re.compile(r'\d+$')
-    _hex_re = re.compile(r'0x[0-9a-fA-F]+$')
+    _octal_re = re.compile(r'-?0\d+$')
+    _decimal_re = re.compile(r'-?\d+$')
+    _hex_re = re.compile(r'-?0x[0-9a-fA-F]+$')
     def parse_immediate(self, imm):
         d = {}
         if self._size_re.search(imm):
