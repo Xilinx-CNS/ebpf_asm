@@ -41,9 +41,9 @@ ld      reg.sz, [reg+disp]  ; LDX.  Omitting .sz always implies 'q', i.e. 64-bit
 ld      [reg+disp], reg.sz  ; STX
 ld      [reg+disp], imm.sz  ; ST
 For BPF_ABS, we can write
-ldpkt   r0.sz, disp
+ldpkt   r0.sz, [disp]
 For BPF_IND, we can write
-ldpkt   r0.sz, reg+disp
+ldpkt   r0.sz, [reg+disp]
 For BPF_XADD we can write
 xadd    [reg+disp], reg.sz  ; sz must be 'q' or 'l'
 Next let's consider ALU[64].  This has a one-bit 'source' (K|X) field, and a
@@ -107,14 +107,18 @@ class BaseAssembler(object):
     def __init__(self, equates):
         self.equates = equates
     _size_re = re.compile(r'\.([bwlq])$')
-    _octal_re = re.compile(r'-?0\d+$')
-    _decimal_re = re.compile(r'-?\d+$')
-    _hex_re = re.compile(r'-?0x[0-9a-fA-F]+$')
+    _octal_re = re.compile(r'0\d+$')
+    _decimal_re = re.compile(r'\d+$')
+    _hex_re = re.compile(r'0x[0-9a-fA-F]+$')
     def parse_immediate(self, imm):
         d = {}
         if self._size_re.search(imm):
             d['size'] = imm[-1]
             imm = imm[:-2]
+        neg = False
+        if imm.startswith('-'):
+            neg = True
+            imm = imm[1:]
         if self._octal_re.match(imm):
             d['imm'] = int(imm, 8)
         elif self._decimal_re.match(imm):
@@ -125,6 +129,8 @@ class BaseAssembler(object):
             d['imm'] = self.equates[imm]
         else:
             raise Exception("Bad immediate", imm)
+        if neg:
+            d['imm'] = -d['imm']
         return d
     _op_args_re = re.compile('(\S+)\s+(\S.*)$')
     def parse_op_args(self, line):
@@ -231,7 +237,6 @@ class ProgAssembler(BaseAssembler):
         """Operand forms:
         
         direct_operand
-        direct_operand+imm
         [direct_operand]
         [direct_operand+imm]
         """
@@ -245,7 +250,7 @@ class ProgAssembler(BaseAssembler):
             d.update(self.parse_offset_operand(operand[1:-1]))
             d['ind'] = True
             return d
-        return self.parse_offset_operand(operand)
+        return self.parse_direct_operand(operand)
 
     def parse_ld(self, _, args):
         """ld dest, src"""
@@ -1031,8 +1036,6 @@ if __name__ == '__main__':
             for line in srcf:
                 asm.feed_line(line)
     asm.resolve_symbols()
-    prog = asm.sections['prog']
-    maps = asm.sections['maps']
     elf = ElfGenerator(asm)
     with open(opts.output, 'wb') as f:
         f.write(elf.binary)

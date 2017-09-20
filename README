@@ -109,6 +109,12 @@ A size suffix goes outside the brackets (as `ld [ptr_reg].sz, src`), not inside
 
 The same notes apply to the `[ptr_reg+disp]` as for Register-to-memory, above.
 
+#### ldpkt
+
+The LD_ABS and LD_IND instructions aren't supported yet.  When they are, they
+will probably look like `ldpkt dst_reg, [disp]` and
+`ldpkt dst_reg, [off_reg+disp]`.
+
 #### xadd
 
 `xadd [ptr_reg+disp], src_reg`
