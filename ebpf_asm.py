@@ -480,7 +480,7 @@ class ProgAssembler(BaseAssembler):
             raise Exception("Bad size", size, "for ALU op", insn['line'])
         if dst.get('imm') is not None:
             raise Exception("neg imm illegal", insn['line'])
-        return {'class': klass, 'op': 'neg', 'dst': dst['reg'], 'src': 0}
+        return {'class': klass, 'op': 'neg', 'dst': dst['reg']}
 
     def generate_end(self, insn):
         dst = insn['dst']
@@ -623,7 +623,7 @@ class ProgAssembler(BaseAssembler):
         # ALU[64]_IMM
         op = self.classes[insn['class']] | self.BPF_K | self.alu_ops[insn['op']]
         regs = insn['dst']
-        return (op, regs, 0, self.check_s32(insn['imm']))
+        return (op, regs, 0, self.check_s32(insn.get('imm', 0)))
 
     def assemble_jmp(self, insn):
         # class, op, dest, {x, src | k, imm}, off
