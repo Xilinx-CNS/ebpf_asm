@@ -28,11 +28,11 @@
 .equ	IP_HDR_DADDR, 16
 .equ	IP_HDR__LEN, 20 ; length of fixed part, excl. options
 
-.equ    IPPROTO_UDP, 17
+.equ	IPPROTO_UDP, 17
 
 ; UDP
-.equ    UDP_HDR_SPORT, 0
-.equ    UDP_HDR_DPORT, 2
-.equ    UDP_HDR_DLEN, 4
-.equ    UDP_HDR_CSUM, 6
-.equ    UDP_HDR__LEN, 8
+.equ	UDP_HDR_SPORT, 0
+.equ	UDP_HDR_DPORT, 2
+.equ	UDP_HDR_DLEN, 4
+.equ	UDP_HDR_CSUM, 6
+.equ	UDP_HDR__LEN, 8
