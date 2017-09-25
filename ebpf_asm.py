@@ -685,7 +685,7 @@ class MapsAssembler(BaseAssembler):
         self.maps = {}
     def parse_map(self, args):
         if len(args) == 4:
-            args = args + ('',)
+            args = args + ['',]
         if len(args) != 5:
             raise Exception("Bad map defn, expected 4 or 5 args, got", args)
         typ, ks, vs, maxent, flags = args
