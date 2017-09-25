@@ -186,7 +186,7 @@ class ProgAssembler(BaseAssembler):
     def length(self):
         return len(self.binary)
 
-    _register_re = re.compile(r'r(?:(\d+)|(fp))$')
+    _register_re = re.compile(r'(?:r(\d+)|(fp))$')
     _label_ref_re = re.compile(r'\w+$')
     def parse_direct_operand(self, operand):
         """Direct operand forms:
