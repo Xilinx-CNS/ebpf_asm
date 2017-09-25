@@ -723,11 +723,11 @@ class MapsAssembler(BaseAssembler):
         d = self.parse_map(args)
         self.maps[name] = self.assemble_map(d)
     def resolve_symbols(self):
-        self.section = []
+        self.section = ''
         self.symbols = {}
         for k, v in self.maps.iteritems():
             self.symbols[k] = len(self.section)
-            self.section.append(v)
+            self.section += v
     @property
     def binary(self):
         return ''.join(self.section)
