@@ -17,6 +17,12 @@ I chose the Intel syntax because my ability to read assembly code is directly
 proportional to how much it resembles Z80.  If you dislike that as much as I
 dislike AT&T-syntax x86 assembly, this may not be the tool for you.
 
+## License
+
+`ebpf_asm` itself and the supplied header files (`defs.i` and `net_hdrs.i`) are
+provided under the MIT license (see comment block at the top of `ebpf_asm.py`).
+The included example programs (`test.s` and `dropper.s`) are dual MIT/GPL.
+
 ## Syntax
 
 Comments are introduced with a semicolon `;` and continue to end of line.

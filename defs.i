@@ -1,5 +1,8 @@
 ; defs.i
 ; Platform constant definitions header
+;
+; Copyright (c) 2017 Solarflare Communications Ltd
+; Provided under the MIT license; see top of ebpf_asm.py for details
 
 ; Map types
 .equ	hash, 1

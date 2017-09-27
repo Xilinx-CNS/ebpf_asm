@@ -1,5 +1,8 @@
 ; net_hdrs.i
 ; Network header offsets
+;
+; Copyright (c) 2017 Solarflare Communications Ltd
+; Provided under the MIT license; see top of ebpf_asm.py for details
 
 ; Ethernet
 .equ	ETHER_HDR_DEST, 0

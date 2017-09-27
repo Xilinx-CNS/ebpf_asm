@@ -44,4 +44,4 @@ dropcnt: percpu_hash, 4, 4, 1024, P
 .data
 .section license
 _license:
-	asciz	"GPL"
+	asciz	"Dual MIT/GPL"
