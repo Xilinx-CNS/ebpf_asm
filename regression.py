@@ -200,13 +200,14 @@ BadAsmTest('Offset too big', 'ld r1, [r0-0x8001]', 'Value out of range for s16')
 BadAsmTest('Size mismatch in ld reg, [ptr]', 'ld r1.q, [r0].l', 'Mismatched sizes').run_test()
 BadAsmTest('Offset operand without indirection', 'ld r1+1, [r0]', 'Bad direct operand r1+1').run_test()
 
-# LD_ABS
+# ldpkt
 
 BadAsmTest('Too few args to ldpkt', 'ldpkt r0', 'Bad ldpkt, expected 2 args').run_test()
 BadAsmTest('Too many args to ldpkt', 'ldpkt r0, [r1], +2', 'Bad ldpkt, expected 2 args').run_test()
 BadAsmTest('ldpkt missing indirection', 'ldpkt r0, r1', 'Bad ldpkt, src must be indirect').run_test()
 BadAsmTest('ldpkt missing indirection', 'ldpkt r0, r1+2', 'Bad direct operand r1+2').run_test()
 
+#  LD_ABS
 AsmTest('LD_ABS (ldpkt)', """
     ldpkt   r0, [1]
     ldpkt   r0.w, [2]
@@ -220,9 +221,30 @@ AsmTest('LD_ABS (ldpkt)', """
 ]).run_test()
 
 BadAsmTest('ldpkt bad dst_reg', 'ldpkt r1, [0]', 'ldpkt dst must be r0, not r1').run_test()
-BadAsmTest('Extraneous + before disp', 'ldpkt r1, [+2]', 'Bad direct operand').run_test()
+BadAsmTest('Extraneous + before disp', 'ldpkt r0, [+2]', 'Bad direct operand').run_test()
 BadAsmTest('Displacement too big', 'ldpkt r0, [0x80000000]', 'Value out of range for s32').run_test()
 BadAsmTest('Displacement too big', 'ldpkt r0, [-0x80000001]', 'Value out of range for s32').run_test()
 BadAsmTest('64-bit ldpkt', 'ldpkt r0.q, [0]', 'ldpkt .q illegal').run_test()
 BadAsmTest('Size mismatch in LD_ABS', 'ldpkt r0.q, [0].l', 'Mismatched sizes').run_test()
 BadAsmTest('Size inside LD_ABS indirection', 'ldpkt r0, [0.l]', 'Bad size in indirect operand').run_test()
+
+#  LD_IND
+AsmTest('LD_IND (ldpkt)', """
+    ldpkt   r0, [r1]
+    ldpkt   r0.w, [r1+-2] ; that +- isn't pretty but we allow it
+    ldpkt   r0, [r2-0x80000000.b].b ; size suffixes on disp are ignored
+    ldpkt   r0.l, [r2+0x7fffffff].l
+""", [
+    (0x40, 0, 1, 0, 0),
+    (0x48, 0, 1, 0, -2),
+    (0x50, 0, 2, 0, -(1 << 31)),
+    (0x40, 0, 2, 0, (1 << 31) - 1),
+]).run_test()
+
+BadAsmTest('ldpkt bad dst_reg', 'ldpkt r1, [r0]', 'ldpkt dst must be r0, not r1').run_test()
+BadAsmTest('Extraneous + before disp', 'ldpkt r0, [r1++2]', 'Bad immediate +2').run_test()
+BadAsmTest('Displacement too big', 'ldpkt r0, [r1+0x80000000]', 'Value out of range for s32').run_test()
+BadAsmTest('Displacement too big', 'ldpkt r0, [r1-0x80000001]', 'Value out of range for s32').run_test()
+BadAsmTest('64-bit ldpkt', 'ldpkt r0.q, [r1]', 'ldpkt .q illegal').run_test()
+BadAsmTest('Size mismatch in LD_IND', 'ldpkt r0.q, [r1].l', 'Mismatched sizes').run_test()
+BadAsmTest('Size inside LD_IND indirection', 'ldpkt r0, [r1.l]', 'Bad size in indirect operand').run_test()
