@@ -266,3 +266,8 @@ _license:
 
 The assembler generates ELF object files, suitable for passing to standard tools
 like iproute2's `ip link set dev ethX xdp obj object-file.o verb`.
+
+## Testing
+
+`ebpf_asm` has a suite of regression tests: run `./regression.py`.  If all is
+well, there should be no output.
