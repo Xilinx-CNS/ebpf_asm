@@ -108,6 +108,7 @@ BadAsmTest('Immediate too big', 'ld r0.l, 0x80000000', 'Value out of range for s
 BadAsmTest('Immediate too big', 'ld r0.l, -0x80000001', 'Value out of range for s32').run_test()
 BadAsmTest('Immediate too big', 'ld r0, 0x10000000000000000', 'Value out of range for u64').run_test()
 BadAsmTest('Negative imm64', 'ld r0, -1', 'Value out of range for u64').run_test()
+BadAsmTest('ld imm, reg', 'ld 0, r0', 'ld imm,... illegal').run_test()
 
 AsmTest('ld reg, reg', """
     ld  r1, r2
@@ -172,3 +173,29 @@ AsmTest('ld [ptr], reg', """
 
 BadAsmTest('Size mismatch in ld [ptr], reg', 'ld [r0].l, r1.q', 'Mismatched sizes').run_test()
 BadAsmTest('Offset operand without indirection', 'ld [r0], r1+1', 'Bad direct operand r1+1').run_test()
+
+# Memory-to-register loads
+
+BadAsmTest('Empty indirection', 'ld r0, []', 'Bad direct operand').run_test()
+BadAsmTest('Missing ]', 'ld r0, [r1', 'Bad indirect operand').run_test()
+BadAsmTest('Missing ] before size', 'ld r0, [r1.l', 'Bad indirect operand').run_test()
+BadAsmTest('Size inside indirection', 'ld r0, [r1.l]', 'Bad size in indirect operand').run_test()
+BadAsmTest('Size inside indirection', 'ld r0, [r1.q+0]', 'Bad size in offset operand').run_test()
+
+AsmTest('ld reg, [ptr]', """
+    ld  r2, [r1]
+    ld  r3, [r1+2].l
+    ld  r3.w, [r1-2]
+    ld  r3.b, [fp-1.b].b
+""", [
+    (0x79, 2, 1, 0, 0),
+    (0x61, 3, 1, 2, 0),
+    (0x69, 3, 1, -2, 0),
+    (0x71, 3, 10, -1, 0),
+]).run_test()
+
+BadAsmTest('ld imm, reg', 'ld 0, [r0]', 'ld imm,... illegal').run_test()
+BadAsmTest('Offset too big', 'ld r1, [r0+0x8000]', 'Value out of range for s16').run_test()
+BadAsmTest('Offset too big', 'ld r1, [r0-0x8001]', 'Value out of range for s16').run_test()
+BadAsmTest('Size mismatch in ld reg, [ptr]', 'ld r1.q, [r0].l', 'Mismatched sizes').run_test()
+BadAsmTest('Offset operand without indirection', 'ld r1+1, [r0]', 'Bad direct operand r1+1').run_test()
