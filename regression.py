@@ -82,6 +82,8 @@ class BadAsmTest(BaseAsmTest):
             raise TestFailure("%s failed\n  expected: %s\n  but prog was accepted" %
                               (self.name, self.err))
 
+# Register-to-register loads
+
 BadAsmTest('Invalid operand', 'ld r0, :', 'Bad direct operand :').run_test()
 BadAsmTest('Too few args to ld', 'ld r0', 'Bad ld, expected 2 args').run_test()
 BadAsmTest('Too many args to ld', 'ld r0, r1, r2', 'Bad ld, expected 2 args').run_test()
@@ -98,7 +100,7 @@ AsmTest('ld reg, imm', """
     (0, 0, 0, 0, 0),
 ]).run_test()
 
-BadAsmTest('Size mismatch in ld reg, imm', 'ld  r0.l, 1.q', 'Mismatched sizes').run_test()
+BadAsmTest('Size mismatch in ld reg, imm', 'ld r0.l, 1.q', 'Mismatched sizes').run_test()
 BadAsmTest('Word-sized ld reg, imm', 'ld r0.w, 1', 'Bad size w for register load').run_test()
 BadAsmTest('Byte-sized ld reg, imm', 'ld r0, 1.b', 'Bad size b for register load').run_test()
 BadAsmTest('Offset where imm expected', 'ld r0, +1', 'Bad direct operand +1').run_test()
@@ -117,7 +119,45 @@ AsmTest('ld reg, reg', """
     (0xbf, 9, 10, 0, 0),
 ]).run_test()
 
-BadAsmTest('Size mismatch in ld reg, reg', 'ld  r0.l, r1.q', 'Mismatched sizes').run_test()
+BadAsmTest('Size mismatch in ld reg, reg', 'ld r0.l, r1.q', 'Mismatched sizes').run_test()
 BadAsmTest('Word-sized ld reg, imm', 'ld r0.w, r1', 'Bad size w for register load').run_test()
 BadAsmTest('Byte-sized ld reg, imm', 'ld r0, r1.b', 'Bad size b for register load').run_test()
 BadAsmTest('Offset operand without indirection', 'ld r0, r1+1', 'Bad direct operand r1+1').run_test()
+
+# Register-to-memory loads
+
+BadAsmTest('Empty indirection', 'ld [], r0', 'Bad direct operand').run_test()
+BadAsmTest('Missing ]', 'ld [r0, r1', 'Bad indirect operand').run_test()
+BadAsmTest('Missing ] before size', 'ld [r0.l, r1', 'Bad indirect operand').run_test()
+BadAsmTest('Size inside indirection', 'ld [r0.l], r1', 'Bad size in indirect operand').run_test()
+BadAsmTest('Size inside indirection', 'ld [r0.q+0], r1', 'Bad size in offset operand').run_test()
+
+AsmTest('ld [ptr], imm', """
+    ld  [r1], 2
+    ld  [r1+0.b].l, 2 ; size suffixes on disp are ignored
+    ld  [r0+1.q], 2.w ; ... even if they're bigger than .w
+    ld  [r0-1].b, -2.b
+""", [
+    (0x7a, 1, 0, 0, 2),
+    (0x62, 1, 0, 0, 2),
+    (0x6a, 0, 0, 1, 2),
+    (0x72, 0, 0, -1, -2),
+]).run_test()
+
+BadAsmTest('Size mismatch in ld [ptr], imm', 'ld [r0].l, 1.q', 'Mismatched sizes').run_test()
+BadAsmTest('Offset where imm expected', 'ld [r0], +1', 'Bad direct operand +1').run_test()
+
+AsmTest('ld [ptr], reg', """
+    ld  [r1], r2
+    ld  [r1+2].l, r3
+    ld  [r1-2], r3.w
+    ld  [fp-1.b].b, r3.b
+""", [
+    (0x7b, 1, 2, 0, 0),
+    (0x63, 1, 3, 2, 0),
+    (0x6b, 1, 3, -2, 0),
+    (0x73, 10, 3, -1, 0),
+]).run_test()
+
+BadAsmTest('Size mismatch in ld [ptr], reg', 'ld [r0].l, r1.q', 'Mismatched sizes').run_test()
+BadAsmTest('Offset operand without indirection', 'ld [r0], r1+1', 'Bad direct operand r1+1').run_test()
