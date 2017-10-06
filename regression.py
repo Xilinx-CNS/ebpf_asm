@@ -90,20 +90,24 @@ BadAsmTest('Too many args to ld', 'ld r0, r1, r2', 'Bad ld, expected 2 args').ru
 
 AsmTest('ld reg, imm', """
     ld  r1, 2
-    ld  r3, 4.l
-    ld  r5, 6.q
+    ld  r2, 0x7fffffff.l
+    ld  r3.q, 0x7fffffff00000001
 """, [
     (0x18, 1, 0, 0, 2),
     (0, 0, 0, 0, 0),
-    (0xb4, 3, 0, 0, 4),
-    (0x18, 5, 0, 0, 6),
-    (0, 0, 0, 0, 0),
+    (0xb4, 2, 0, 0, (1<<31) - 1),
+    (0x18, 3, 0, 0, 1),
+    (0, 0, 0, 0, (1<<31) - 1),
 ]).run_test()
 
 BadAsmTest('Size mismatch in ld reg, imm', 'ld r0.l, 1.q', 'Mismatched sizes').run_test()
 BadAsmTest('Word-sized ld reg, imm', 'ld r0.w, 1', 'Bad size w for register load').run_test()
 BadAsmTest('Byte-sized ld reg, imm', 'ld r0, 1.b', 'Bad size b for register load').run_test()
 BadAsmTest('Offset where imm expected', 'ld r0, +1', 'Bad direct operand +1').run_test()
+BadAsmTest('Immediate too big', 'ld r0.l, 0x80000000', 'Value out of range for s32').run_test()
+BadAsmTest('Immediate too big', 'ld r0.l, -0x80000001', 'Value out of range for s32').run_test()
+BadAsmTest('Immediate too big', 'ld r0, 0x10000000000000000', 'Value out of range for u64').run_test()
+BadAsmTest('Negative imm64', 'ld r0, -1', 'Value out of range for u64').run_test()
 
 AsmTest('ld reg, reg', """
     ld  r1, r2
@@ -134,18 +138,25 @@ BadAsmTest('Size inside indirection', 'ld [r0.q+0], r1', 'Bad size in offset ope
 
 AsmTest('ld [ptr], imm', """
     ld  [r1], 2
-    ld  [r1+0.b].l, 2 ; size suffixes on disp are ignored
+    ld  [r1+0x7fff.b].l, 2 ; size suffixes on disp are ignored
     ld  [r0+1.q], 2.w ; ... even if they're bigger than .w
-    ld  [r0-1].b, -2.b
+    ld  [r0-0x8000].b, -2.b
+    ld  [r0], 0x7fffffff
+    ld  [r0], -0x80000000
 """, [
     (0x7a, 1, 0, 0, 2),
-    (0x62, 1, 0, 0, 2),
+    (0x62, 1, 0, 32767, 2),
     (0x6a, 0, 0, 1, 2),
-    (0x72, 0, 0, -1, -2),
+    (0x72, 0, 0, -32768, -2),
+    (0x7a, 0, 0, 0, (1<<31) - 1),
+    (0x7a, 0, 0, 0, -(1<<31)),
 ]).run_test()
 
 BadAsmTest('Size mismatch in ld [ptr], imm', 'ld [r0].l, 1.q', 'Mismatched sizes').run_test()
 BadAsmTest('Offset where imm expected', 'ld [r0], +1', 'Bad direct operand +1').run_test()
+BadAsmTest('Immediate too big', 'ld [r0], 0x80000000', 'Value out of range for s32').run_test()
+BadAsmTest('Offset too big', 'ld [r0+0x8000], 1', 'Value out of range for s16').run_test()
+BadAsmTest('Offset too big', 'ld [r0-0x8001], 1', 'Value out of range for s16').run_test()
 
 AsmTest('ld [ptr], reg', """
     ld  [r1], r2

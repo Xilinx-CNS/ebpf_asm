@@ -70,7 +70,9 @@ though a few instructions take more (or fewer) operands.
 
 Operands typically may be either register names (`r0` to `r10`, or `fp` as a
 synonym for `r10`) or literals (decimal, 0octal, 0xhex, or an equate name); some
-instructions can also take memory references `[reg+disp]`.
+instructions can also take memory references `[reg+disp]`.  Literals normally
+must fit in a 32-bit signed integer, except for
+[`ld reg.q, imm`](#register-to-register).
 
 Operands can also include a _size suffix_, a dot `.` followed by a letter:
 
@@ -93,7 +95,9 @@ If both operands have size suffixes, they must match; if neither has, then quad
 
 `ld dst_reg, src_imm`
 
-Size must be quad (`.q`) or long (`.l`).
+Size must be quad (`.q`) or long (`.l`).  For size quad, `src_imm` may be a map
+name (defined in the maps section); otherwise, it is an _unsigned_ 64-bit
+integer.
 
 ##### Register-to-memory
 
@@ -108,7 +112,7 @@ regardless of any size suffix.
 A size suffix goes outside the brackets (as `ld [ptr_reg].sz, src`), not inside
 (since the pointer must always be full-sized).
 
-`src_imm` is a signed 32-bit quantity (i.e. long, `.l`).
+Regardless of size suffix, `src_imm` must fit in a signed 32-bit integer.
 
 ##### Memory-to-register
 
@@ -266,7 +270,8 @@ _license:
 ## Output format
 
 The assembler generates ELF object files, suitable for passing to standard tools
-like iproute2's `ip link set dev ethX xdp obj object-file.o verb`.
+like iproute2's `ip link set dev ethX xdp obj object-file.o verb`.  Currently
+only little-endian output (aka 'bpfel') is supported.
 
 ## Testing
 

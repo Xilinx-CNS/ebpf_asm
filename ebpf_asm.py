@@ -646,6 +646,11 @@ class ProgAssembler(BaseAssembler):
             raise Exception("Value out of range for s32", imm)
         return imm
 
+    def check_u64(self, imm):
+        if imm >= (1 << 64) or imm < 0:
+            raise Exception("Value out of range for u64", imm)
+        return imm
+
     def assemble_ld(self, insn):
         # LD_IMM64: class, dst, src, imm + second insn
         # LD_ABS: class, mode, size, imm32
@@ -653,7 +658,12 @@ class ProgAssembler(BaseAssembler):
         op = self.classes[insn['class']] | self.ld_modes[insn['mode']] | self.sizes[insn['size']]
         if insn['mode'] == 'imm':
             regs = insn['dst']
-            return [(op, regs, 0, insn['imm']), (0, 0, 0, 0)]
+            if isinstance(insn['imm'], str):
+                return [(op, regs, 0, insn['imm']), (0, 0, 0, 0)]
+            lo, hi = struct.unpack('<ii', struct.pack('<Q',
+                            self.check_u64(insn['imm'])))
+            return [(op, regs, 0, self.check_s32(lo)),
+                    (0, 0, 0, self.check_s32(hi))]
         regs = insn['src'] << 4
         return (op, regs, 0, self.check_s32(insn['imm']))
 
