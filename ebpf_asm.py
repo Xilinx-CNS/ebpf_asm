@@ -249,7 +249,10 @@ class ProgAssembler(BaseAssembler):
                 raise Exception("Bad size in offset operand", operand)
             d['off'] = -self.parse_immediate(disp)['imm']
             return d
-        return self.parse_direct_operand(operand)
+        d = self.parse_direct_operand(operand)
+        if 'size' in d: # can't have e.g. [reg.sz], only [reg].sz is legal
+            raise Exception("Bad size in indirect operand", operand)
+        return d
 
     def parse_operand(self, operand):
         """Operand forms:

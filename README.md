@@ -102,7 +102,8 @@ Size must be quad (`.q`) or long (`.l`).
 `ld [ptr_reg+disp], src_imm`
 
 The displacement `disp` may be omitted (as `ld [ptr_reg], src`) or negative (as
-`ld [ptr_reg-disp], src`).  It is a signed 16-bit quantity (i.e. word, `.w`).
+`ld [ptr_reg-disp], src`).  It is a signed 16-bit quantity (i.e. word)
+regardless of any size suffix.
 
 A size suffix goes outside the brackets (as `ld [ptr_reg].sz, src`), not inside
 (since the pointer must always be full-sized).
