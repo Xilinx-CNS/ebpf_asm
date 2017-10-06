@@ -117,9 +117,30 @@ The same notes apply to the `[ptr_reg+disp]` as for Register-to-memory, above.
 
 #### ldpkt
 
-The LD_ABS and LD_IND instructions aren't supported yet.  When they are, they
-will probably look like `ldpkt dst_reg, [disp]` and
-`ldpkt dst_reg, [off_reg+disp]`.
+The packet-load instruction `ldpkt r0, src` is used for reading packet data into
+registers, in a complicated way for historical reasons.  It represents the
+BPF\_ABS and BPF\_IND modes of the BPF\_LD opcode, which can only be used in
+socket filter, sched\_cls and sched\_act programs.
+
+`ldpkt r0, [disp]`
+
+`ldpkt r0, [off_reg+disp]`
+
+If both operands have size suffixes, they must match; if neither has, then,
+**unlike most other instructions**, long (`.l`) is assumed.  This is because
+these instructions, being holdovers from classic BPF, _do not have_ quad-sized
+forms (which would be rejected by the verifier).
+
+There are other restrictions on its use: the destination register must be `r0`,
+`r6` must contain a pointer to the sk\_buff, and registers `r1`-`r5` are
+clobbered.  The value read will be converted to host-endianness.
+
+Unless you know you want this, you probably want an ordinary
+[memory-to-register load](#memory-to-register) using a packet-pointer, instead.
+
+See the kernel's [BPF documentation][1] for further enlightenment.
+
+[1]: https://www.kernel.org/doc/Documentation/networking/filter.txt
 
 #### xadd
 

@@ -257,6 +257,7 @@ class ProgAssembler(BaseAssembler):
         direct_operand
         [direct_operand]
         [direct_operand+imm]
+        [imm]
         """
         if operand.startswith('['):
             d = {}
@@ -276,6 +277,22 @@ class ProgAssembler(BaseAssembler):
             raise Exception("Bad ld, expected 2 args, got", args)
         dst, src = map(self.parse_operand, args)
         return {'op': 'ld', 'dst': dst, 'src': src}
+
+    def parse_ldpkt(self, op, args):
+        """ldpkt r0, src
+        
+        src forms:
+        [disp]
+        [off_reg+disp]"""
+        if len(args) != 2:
+            raise Exception("Bad ldpkt, expected 2 args, got", args)
+        dst = self.parse_direct_operand(args[0])
+        if 'reg' not in dst:
+            raise Exception("Bad ldpkt, dst must be reg, not", args[0])
+        src = self.parse_operand(args[1])
+        if not src.get('ind'):
+            raise Exception("Bad ldpkt, src must be indirect, not", args[1])
+        return {'op': 'ldpkt', 'dst': dst, 'src': src}
 
     def parse_alu(self, op, args):
         """op dest, src"""
@@ -381,7 +398,8 @@ class ProgAssembler(BaseAssembler):
                   'mod': parse_alu, 'xor': parse_alu,
                   'arsh': parse_alu, 'end': parse_end,
                   'jr': parse_jmp, 'call': parse_call,
-                  'exit': parse_exit, 'xadd': parse_xadd,}
+                  'exit': parse_exit, 'xadd': parse_xadd,
+                  'ldpkt': parse_ldpkt,}
 
     def parse_line(self, line):
         m = self._label_re.match(line)
@@ -562,6 +580,28 @@ class ProgAssembler(BaseAssembler):
         return {'class': 'stx', 'mode': 'xadd', 'size': size,
                 'dst': dst['reg'], 'src': src['reg'], 'off': dst.get('off', 0)}
 
+    def generate_ldpkt(self, insn):
+        dst = insn['dst']
+        src = insn['src']
+        size = src.get('size', dst.get('size'))
+        if 'size' in src and 'size' in dst:
+            # Normally we don't specify both.  But if we do, they must match
+            if size != dst['size']:
+                raise Exception("Mismatched sizes", insn['line'])
+        if size is None:
+            size = 'l'
+        if size == 'q':
+            raise Exception("ldpkt .q illegal", insn['line'])
+        if dst['reg'] != 0:
+            raise Exception("ldpkt dst must be r0, not r%(reg)d" % dst)
+        if src.get('reg') is None:
+            # LD_ABS
+            return {'class': 'ld', 'mode': 'abs', 'size': size,
+                    'imm': src['imm'], 'dst': 0, 'src': 0, 'off': 0}
+        # LD_IND
+        return {'class': 'ld', 'mode': 'ind', 'size': size, 'src': src['reg'],
+                'imm': src.get('off', 0), 'dst': 0, 'off': 0}
+
     op_generators = {'ld': generate_ld, 'add': generate_alu,
                      'sub': generate_alu, 'mul': generate_alu,
                      'div': generate_alu, 'or': generate_alu,
@@ -570,7 +610,8 @@ class ProgAssembler(BaseAssembler):
                      'mod': generate_alu, 'xor': generate_alu,
                      'arsh': generate_alu, 'end': generate_end,
                      'jr': generate_jr, 'call': generate_call,
-                     'exit': generate_exit, 'xadd': generate_xadd,}
+                     'exit': generate_exit, 'xadd': generate_xadd,
+                     'ldpkt': generate_ldpkt,}
 
     def generate_insn(self, insn):
         if insn['op'] not in self.op_generators:
@@ -604,14 +645,14 @@ class ProgAssembler(BaseAssembler):
 
     def assemble_ld(self, insn):
         # LD_IMM64: class, dst, src, imm + second insn
-        # LD_ABS: class, mode, size, off32
-        # LD_IND: class, mode, size, src, off32
+        # LD_ABS: class, mode, size, imm32
+        # LD_IND: class, mode, size, src, imm32
         op = self.classes[insn['class']] | self.ld_modes[insn['mode']] | self.sizes[insn['size']]
         if insn['mode'] == 'imm':
             regs = insn['dst']
             return [(op, regs, 0, insn['imm']), (0, 0, 0, 0)]
         regs = insn['src'] << 4
-        return (op, regs, 0, self.check_s32(insn['off']))
+        return (op, regs, 0, self.check_s32(insn['imm']))
 
     def assemble_ldx(self, insn):
         # class, mode, size, dst, src, off
