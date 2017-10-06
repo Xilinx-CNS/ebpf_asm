@@ -69,10 +69,10 @@ Text sections consist of instructions generally in the form `op dst, src`,
 though a few instructions take more (or fewer) operands.
 
 Operands typically may be either register names (`r0` to `r10`, or `fp` as a
-synonym for `r10`) or literals (decimal, 0octal, 0xhex, or an equate name); some
-instructions can also take memory references `[reg+disp]`.  Literals normally
-must fit in a 32-bit signed integer, except for
-[`ld reg.q, imm`](#register-to-register).
+synonym for `r10`) or literals (decimal, 0octal, 0xhex, or an equate name).
+Literals normally must fit in a 32-bit signed integer, except for
+[`ld reg.q, imm`](#register-to-register).  Some instructions can also take
+memory references `[reg+disp]` for some operands.
 
 Operands can also include a _size suffix_, a dot `.` followed by a letter:
 
