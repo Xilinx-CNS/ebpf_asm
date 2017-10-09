@@ -367,6 +367,11 @@ AllTests = [
     BadAsmTest('Call undefined function', 'call undefined', 'Bad immediate undefined'),
     BadAsmTest('Call register', 'call r0', 'Bad immediate r0'),
 
+    # Program exit
+
+    BadAsmTest('Too many args to exit', 'exit 1', 'Bad exit, expected no args'),
+    AsmTest('exit', 'exit', [(0x95, 0, 0, 0, 0)]),
+
 ]
 
 def run_testset(tests, verbose=False):
