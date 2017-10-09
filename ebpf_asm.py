@@ -580,6 +580,8 @@ class ProgAssembler(BaseAssembler):
             raise Exception("xadd ...,imm illegal", insn['line'])
         if size is None:
             size = 'q'
+        if size not in ['q', 'l']:
+            raise Exception("Bad size", size, "for xadd", insn['line'])
         return {'class': 'stx', 'mode': 'xadd', 'size': size,
                 'dst': dst['reg'], 'src': src['reg'], 'off': dst.get('off', 0)}
 
