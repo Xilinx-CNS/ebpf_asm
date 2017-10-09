@@ -88,9 +88,21 @@ class BadAsmTest(BaseAsmTest):
 
 AllTests = [
 
+    # Bogus format
+
+    BadAsmTest('Nonexistent insn', 'frob r0', 'Unrecognised instruction frob'),
+    BadAsmTest('Label and insn on same line', 'label: exit', 'Unrecognised instruction label:'),
+    BadAsmTest('Comma before insn', ', exit', 'Unrecognised instruction ,'),
+    BadAsmTest('Comma after insn', 'ld, r0', 'Unrecognised instruction ld,'),
+    BadAsmTest('Bad character in label', 'a,:', 'Unrecognised instruction a,:'),
+    BadAsmTest('Whitespace in label', 'a :', 'Unrecognised instruction a'),
+    BadAsmTest('Numeric label', '1:', 'Unrecognised instruction 1:'),
+    BadAsmTest('Invalid label', '-1:', 'Unrecognised instruction -1:'),
+
     # Register-to-register loads
 
     BadAsmTest('Invalid operand', 'ld r0, :', 'Bad direct operand :'),
+    BadAsmTest('Empty operand', 'ld , 1', 'Bad direct operand '),
     BadAsmTest('Too few args to ld', 'ld r0', 'Bad ld, expected 2 args'),
     BadAsmTest('Too many args to ld', 'ld r0, r1, r2', 'Bad ld, expected 2 args'),
 
