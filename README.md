@@ -276,4 +276,5 @@ only little-endian output (aka 'bpfel') is supported.
 ## Testing
 
 `ebpf_asm` has a suite of regression tests: run `./regression.py`.  If all is
-well, there should be no output.
+well, there should be no output, and the return code will be zero.  For verbose
+mode, use the switch `-v`.
