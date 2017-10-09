@@ -61,7 +61,14 @@ immediate will be ignored.
 
 A label consists of a sequence of alphanumeric characters followed by a colon
  `:`, which is omitted when referring to the label.  The label points at the
- following instruction (in .text) or datum (in .data).
+ following instruction (in .text) or datum (in .data).  A label may not begin
+ with a digit, since that could cause confusion if references to the label look
+ like numeric literals.  (Strictly speaking we could allow this, because jumps
+ always prefix their literals with `+` or `-`, but we forbid it so that when you
+ forget the `+` you get a meaningful error.)
+
+Note that code cannot appear on the same line as the label!  This is something
+ we probably ought to support, but currently don't.
 
 ### Instructions
 

@@ -156,7 +156,7 @@ class BaseAssembler(object):
         if not m:
             return (line, '')
         return m.groups()
-    _label_re = re.compile('\s*(\w+):$')
+    _label_re = re.compile('\s*(?=\D)(\w+):$')
 
 class ProgAssembler(BaseAssembler):
     elf_flags = 'AX'
