@@ -53,9 +53,9 @@ directive.
 
 #### .equ
 
-`.equ name, immediate` defines the given name to equal the immediate (which
-could be a literal, or the name of another equate).  Any size suffix on the
-immediate will be ignored.
+`.equ name, immediate` defines the given name to equal the `immediate` (which
+could be a literal, or the name of another equate).  The `immediate` does not
+accept a size suffix.
 
 `name` is any string which does not start with a digit and does not contain a
 comma (`,`).  It _may_ contain internal whitespace.
