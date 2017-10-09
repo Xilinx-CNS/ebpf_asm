@@ -57,6 +57,19 @@ directive.
 could be a literal, or the name of another equate).  Any size suffix on the
 immediate will be ignored.
 
+`name` is any string which does not start with a digit and does not contain a
+comma (`,`).  It _may_ contain internal whitespace.
+
+Register names are legal as equate names, but where an operand could be either
+it will be treated as a register name.  However, operands which are required to
+be immediates, not registers, will treat it as an equate.  This is potentially
+very confusing, so don't do this!
+
+An equate can be defined with a `name` that ends in a size suffix, but accessing
+the equate will require using two size suffixes (sometimes three, which is
+arguably a bug but not trivial to fix).  This is also confusing, so don't do
+this either!
+
 ### Labels
 
 A label consists of a sequence of alphanumeric characters followed by a colon

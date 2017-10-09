@@ -892,6 +892,8 @@ class Assembler(BaseAssembler):
         if len(args) != 2:
             raise Exception("Bad .equ, expected 2 args, got", args)
         name, val = args
+        if not name or name[0].isdigit():
+            raise Exception('Bad .equ name', name)
         val = self.parse_immediate(val)['imm']
         self.equates[name] = val
     def feed_line(self, line):

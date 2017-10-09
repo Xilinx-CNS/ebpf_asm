@@ -524,6 +524,45 @@ AllTests = [
         asciz '''quu'x'''
     """, ['foo', 'ba"r', "quu'x", '']),
 
+    ## ASSEMBLER DIRECTIVES
+
+    # Equates
+
+    BadAsmTest('Too few args to .equ', '.equ name', 'Bad .equ, expected 2 args'),
+    BadAsmTest('Too many args to .equ', '.equ name, 1, 2', 'Bad .equ, expected 2 args'),
+    BadAsmTest('Malformed equate value', '.equ name, :', 'Bad immediate :'),
+    BadAsmTest('Comma after .equ', '.equ, name, 1', 'No such directive .equ,'),
+    BadAsmTest('Empty equate name', '.equ , 1', 'Bad .equ name '),
+    BadAsmTest('Equate name starts with digit', '.equ 1, 2', 'Bad .equ name 1'),
+    BadAsmTest('Equate value undefined', '.equ name, value', 'Bad immediate value'),
+    BadAsmTest('Offset where imm expected', '.equ name, +0', 'Bad immediate +0'),
+
+    AsmTest('Equates', """
+        .equ    foo, 1.b
+        .equ    a b, foo
+        .equ    :, -1
+        .equ    r1, :
+        .equ    foo.b, 2
+        ld  r1, a b
+        ld  r2, :.l
+        ld  r3, r1.l ; register name takes priority over equate name
+        ld  [r4+r1], 1 ; can't be a register, so must be an equate
+        ld  [r5], foo.b ; resolves to foo
+        ld  [r6], foo.b.b.b ; resolves to foo.b (we need three because reasons)
+    """, [
+        (0x18, 1, 0, 0, 1),
+        (0, 0, 0, 0, 0),
+        (0xb4, 2, 0, 0, -1),
+        (0xbc, 3, 1, 0, 0),
+        (0x7a, 4, 0, -1, 1),
+        (0x72, 5, 0, 0, 1),
+        (0x72, 6, 0, 0, 2),
+    ]),
+
+    BadAsmTest('Size suffix stripping from equate', """
+        .equ    foo.b, 1
+        ld  [r1], foo.b
+    """, 'Value out of range for s32 foo'),
 ]
 
 def run_testset(tests, verbose=False):
