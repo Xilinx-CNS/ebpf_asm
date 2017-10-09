@@ -308,3 +308,18 @@ only little-endian output (aka 'bpfel') is supported.
 `ebpf_asm` has a suite of regression tests: run `./regression.py`.  If all is
 well, there should be no output, and the return code will be zero.  For verbose
 mode, use the switch `-v`.
+
+## To Do
+
+Ideas for the future.
+
+* Test behaviour around trying to use labels as immediates/displacements.
+* Tests for map definitions.
+* "Loose mode" that allows bad things like registers `r11`-`r15`, a `raw`
+  instruction that takes a 5-tuple, invalid sizes to various ops, etc.; in order
+  to construct bad binaries to test the kernel's verifier.
+* Support `label: instruction`.
+* Support big-endian output ('bpfeb') and _maybe_ default to host endianness.
+* Constant expressions.  Wherever a literal is expected, we should be able to
+  have an expression instead.  We can even use `(parentheses)` for grouping,
+  since indirection uses `[brackets]`.
