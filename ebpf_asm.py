@@ -716,6 +716,8 @@ class ProgAssembler(BaseAssembler):
             return (op, regs, off, self.check_s32(insn['imm']))
         if insn['op'] == 'call':
             op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
+            if not isinstance(insn['imm'], str):
+                self.check_s32(insn['imm'])
             return (op, 0, 0, insn['imm'])
         # ja, exit
         op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
