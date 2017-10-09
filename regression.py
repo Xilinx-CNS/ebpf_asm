@@ -141,12 +141,14 @@ AllTests = [
         ld  r1, 2
         ld  r2, 0x7fffffff.l
         ld  r3.q, 0x7fffffff00000001
+        ld  r1, 3.l.b ; double-suffix bug
     """, [
         (0x18, 1, 0, 0, 2),
         (0, 0, 0, 0, 0),
         (0xb4, 2, 0, 0, (1<<31) - 1),
         (0x18, 3, 0, 0, 1),
         (0, 0, 0, 0, (1<<31) - 1),
+        (0xb4, 1, 0, 0, 3),
     ]),
 
     BadAsmTest('Size mismatch in ld reg, imm', 'ld r0.l, 1.q', 'Mismatched sizes'),
@@ -194,6 +196,7 @@ AllTests = [
         ld  [r0-0x8000].b, -2.b
         ld  [r0], 0x7fffffff
         ld  [r0], -0x80000000
+        ld  [r1], 4.w.b ; double-suffix bug
     """, [
         (0x7a, 1, 0, 0, 2),
         (0x62, 1, 0, 32767, 2),
@@ -201,6 +204,7 @@ AllTests = [
         (0x72, 0, 0, -32768, -2),
         (0x7a, 0, 0, 0, (1<<31) - 1),
         (0x7a, 0, 0, 0, -(1<<31)),
+        (0x6a, 1, 0, 0, 4),
     ]),
 
     BadAsmTest('Size mismatch in ld [ptr], imm', 'ld [r0].l, 1.q', 'Mismatched sizes'),
@@ -208,6 +212,7 @@ AllTests = [
     BadAsmTest('Immediate too big', 'ld [r0], 0x80000000', 'Value out of range for s32'),
     BadAsmTest('Offset too big', 'ld [r0+0x8000], 1', 'Value out of range for s16'),
     BadAsmTest('Offset too big', 'ld [r0-0x8001], 1', 'Value out of range for s16'),
+    BadAsmTest('Double size suffix', 'ld [r0+1.b.b], 1', 'Bad immediate 1.b'),
 
     AsmTest('ld [ptr], reg', """
         ld  [r1], r2

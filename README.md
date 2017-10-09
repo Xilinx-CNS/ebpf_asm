@@ -119,6 +119,9 @@ Size must be quad (`.q`) or long (`.l`).  For size quad, `src_imm` may be a map
 name (defined in the maps section); otherwise, it is an _unsigned_ 64-bit
 integer.
 
+Known bug: `src_imm` can have two size suffixes; the first will be used.  E.g.
+`ld r1, 2.l.b` is a 32-bit load.
+
 ##### Register-to-memory
 
 `ld [ptr_reg+disp], src_reg`
@@ -133,6 +136,9 @@ A size suffix goes outside the brackets (as `ld [ptr_reg].sz, src`), not inside
 (since the pointer must always be full-sized).
 
 Regardless of size suffix, `src_imm` must fit in a signed 32-bit integer.
+
+Known bug: `src_imm` can have two size suffixes; the first will be used.  E.g.
+`ld [r1], 2.b.w` is an 8-bit load.
 
 ##### Memory-to-register
 
