@@ -10,26 +10,7 @@ import struct
 
 class TestFailure(Exception): pass
 
-class BaseAsmTest(object):
-    @property
-    def prog_header(self):
-        return """
-        .include defs.i
-        
-        .text
-        .section prog
-        """
-    @property
-    def prog(self):
-        return self.prog_header + self.src
-    def assemble(self):
-        self.asm = asm.Assembler()
-        for line in self.prog.splitlines():
-            self.asm.feed_line(line)
-        self.asm.resolve_symbols()
-        self.prog_bin = self.asm.sections['prog'].binary
-
-class AsmTest(BaseAsmTest):
+class AcceptTestMixin(object):
     """Test a program snippet, compare result against known binary"""
     def __init__(self, name, src, out):
         self.name = name
@@ -37,13 +18,6 @@ class AsmTest(BaseAsmTest):
         self.out = out
     def __str__(self):
         return 'ACC ' + self.name
-    def dump(self):
-        self.prog_dis = []
-        for i in xrange(0, len(self.prog_bin), 8):
-            op, regs, off, imm = struct.unpack('<BBhi', self.prog_bin[i:i+8])
-            dst = regs & 0xf
-            src = regs >> 4
-            self.prog_dis.append((op, dst, src, off, imm))
     def run(self):
         self.assemble()
         self.dump()
@@ -66,7 +40,7 @@ class AsmTest(BaseAsmTest):
                             delta.append('+ ' + str(self.prog_dis[b]))
             raise TestFailure("%s failed:\n%s" % (self.name, '\n'.join(delta)))
 
-class BadAsmTest(BaseAsmTest):
+class RejectTestMixin(object):
     """Test an invalid program snippet, check that correct error is thrown"""
     def __init__(self, name, src, err):
         self.name = name
@@ -86,7 +60,63 @@ class BadAsmTest(BaseAsmTest):
             raise TestFailure("%s failed\n  expected: %s\n  but prog was accepted" %
                               (self.name, self.err))
 
+class BaseAsmTest(object):
+    @property
+    def prog_header(self):
+        return """
+        .include defs.i
+
+        .text
+        .section prog
+        """
+    @property
+    def prog(self):
+        return self.prog_header + self.src
+    def assemble(self):
+        self.asm = asm.Assembler()
+        for line in self.prog.splitlines():
+            self.asm.feed_line(line)
+        self.asm.resolve_symbols()
+        self.prog_bin = self.asm.sections['prog'].binary
+    def dump(self):
+        self.prog_dis = []
+        for i in xrange(0, len(self.prog_bin), 8):
+            op, regs, off, imm = struct.unpack('<BBhi', self.prog_bin[i:i+8])
+            dst = regs & 0xf
+            src = regs >> 4
+            self.prog_dis.append((op, dst, src, off, imm))
+
+class AsmTest(BaseAsmTest, AcceptTestMixin): pass
+class BadAsmTest(BaseAsmTest, RejectTestMixin): pass
+
+class BaseDataTest(object):
+    @property
+    def prog_header(self):
+        return """
+        .include defs.i
+
+        .data
+        .section data
+        """
+    @property
+    def prog(self):
+        return self.prog_header + self.src
+    def assemble(self):
+        self.asm = asm.Assembler()
+        for line in self.prog.splitlines():
+            self.asm.feed_line(line)
+        self.asm.resolve_symbols()
+        self.prog_bin = self.asm.sections['data'].binary
+    def dump(self):
+        # TODO teach this to return offsets & symbols
+        self.prog_dis = self.prog_bin.split('\0')
+
+class DataTest(BaseDataTest, AcceptTestMixin): pass
+class BadDataTest(BaseDataTest, RejectTestMixin): pass
+
 AllTests = [
+
+    ## PROGRAM TEXT
 
     # Bogus format
 
@@ -98,6 +128,7 @@ AllTests = [
     BadAsmTest('Whitespace in label', 'a :', 'Unrecognised instruction a'),
     BadAsmTest('Numeric label', '1:', 'Unrecognised instruction 1:'),
     BadAsmTest('Invalid label', '-1:', 'Unrecognised instruction -1:'),
+    BadAsmTest('Data in program section', 'asciz "foo"', 'Unrecognised instruction asciz'),
 
     # Register-to-register loads
 
@@ -477,6 +508,21 @@ AllTests = [
     BadAsmTest('Byte-sized end', 'end le, r0.b', 'Bad size b for endian op'),
     BadAsmTest('Bad endian direction', 'end r1, r2', 'Bad end, expected le or be'),
     BadAsmTest('Size on endian direction', 'end le.l, r0', 'Bad end, expected le or be'),
+
+    ## STATIC DATA
+
+    BadDataTest('Instruction in data section', 'ld r0, 0', 'No such .data insn'),
+    BadDataTest('asciz bad type', 'asciz 1', 'asciz takes a string'),
+    BadDataTest('asciz malformed', 'asciz "', 'EOL while scanning string literal'),
+    BadDataTest('Too few args to asciz', 'asciz', 'unexpected EOF while parsing'),
+    BadDataTest('Too many args to asciz', 'asciz "a", "b"', 'asciz takes a string'),
+
+    DataTest('Static strings', """
+    strings:
+        asciz "foo"
+        asciz 'ba"r'
+        asciz '''quu'x'''
+    """, ['foo', 'ba"r', "quu'x", '']),
 
 ]
 
