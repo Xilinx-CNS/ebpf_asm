@@ -590,6 +590,35 @@ AllTests = [
     """, 'Bad direct operand foo.b.b'),
     BadAsmTest('Size suffix on equate value', '.equ foo, 1.b', 'Bad immediate 1.b'),
 
+    # Sections
+
+    AsmTest('Sections', """
+        .section foo
+        end le, r0
+        .section prog
+        ld  r0, 0
+        .data
+        .section data
+        asciz 'bar'
+        .text
+        .section prog
+        exit
+    """, [
+        (0x18, 0, 0, 0, 0),
+        (0, 0, 0, 0, 0),
+        (0x95, 0, 0, 0, 0),
+    ]),
+
+    BadAsmTest('Section type mismatch', """
+        .data
+        .section prog
+    """, 'Section prog redefined as different type'),
+    AsmTest('Section after maps', """
+        .section maps
+        .section prog
+        exit
+    """, [(0x95, 0, 0, 0, 0)]),
+
 ]
 
 def run_testset(tests, verbose=False):
