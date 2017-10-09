@@ -115,19 +115,20 @@ AllTests = [
     BadAsmTest('Immediate too big', 'ld r0, 0x10000000000000000', 'Value out of range for u64'),
     BadAsmTest('Negative imm64', 'ld r0, -1', 'Value out of range for u64'),
     BadAsmTest('ld imm, reg', 'ld 0, r0', 'ld imm,... illegal'),
+    BadAsmTest('Non-existent register', 'ld r11, 0', 'Bad register r11'),
 
     AsmTest('ld reg, reg', """
         ld  r1, r2
         ld  r3.l, r4
         ld  r5, r6.l
         ld  r7.l, r8.l
-        ld  r9.q, fp
+        ld  r10.q, fp
     """, [
         (0xbf, 1, 2, 0, 0),
         (0xbc, 3, 4, 0, 0),
         (0xbc, 5, 6, 0, 0),
         (0xbc, 7, 8, 0, 0),
-        (0xbf, 9, 10, 0, 0),
+        (0xbf, 10, 10, 0, 0),
     ]),
 
     BadAsmTest('Size mismatch in ld reg, reg', 'ld r0.l, r1.q', 'Mismatched sizes'),
@@ -281,6 +282,67 @@ AllTests = [
     BadAsmTest('Size mismatch in xadd', 'xadd [r1].q, r0.l', 'Mismatched sizes'),
     BadAsmTest('Word-sized xadd', 'xadd [r0].w, r1', 'Bad size w for xadd'),
     BadAsmTest('Byte-sized xadd', 'xadd [r0], r1.b', 'Bad size b for xadd'),
+
+    # Jumps
+
+    BadAsmTest('Jump with no args', 'jr', 'Bad jr, expected 1 or 4 args'),
+    BadAsmTest('Jump with two args', 'jr cc, +1', 'Bad jr, expected 1 or 4 args'),
+    BadAsmTest('Jump with five args', 'jr nz, r0, r1, 2, +1', 'Bad jr, expected 1 or 4 args'),
+
+    #  Unconditional
+    AsmTest('Unconditional jump', """
+        jr  +0x7fff
+        label:
+        jr  -0x8000
+        jr  label
+    """, [
+        (0x05, 0, 0, 32767, 0),
+        (0x05, 0, 0, -32768, 0),
+        (0x05, 0, 0, -2, 0),
+    ]),
+
+    BadAsmTest('Jump offset too big', 'jr +0x8000', 'Value out of range for s16'),
+    BadAsmTest('Jump offset too big', 'jr -0x8001', 'Value out of range for s16'),
+    BadAsmTest('Jump to undefined label', 'jr undefined', 'Undefined symbol undefined'),
+    BadAsmTest('Jump offset missing +', 'jr 1', 'Bad jump offset (missing + sign?)'),
+    BadAsmTest('Jump offset with two + signs', 'jr ++1', 'Bad immediate +1'),
+
+    #  Conditional, BPF_K
+    AsmTest('Compare immediate and jump', """
+        jr  z, r1, 0, +1
+        label:
+        jr  gt, r1, 0x7fffffff, +2
+        jr  eq, r1, -0x80000000.q, label
+        jr  &, r1, 1.b, -1.b
+        jr  sle, fp, 0, +-1 ; that +- isn't pretty but we allow it
+    """, [
+        (0x15, 1, 0, 1, 0),
+        (0x25, 1, 0, 2, (1 << 31) - 1),
+        (0x15, 1, 0, -2, -(1 << 31)),
+        (0x45, 1, 0, -1, 1),
+        (0xd5, 10, 0, -1, 0),
+    ]),
+
+    BadAsmTest('Immediate too big', 'jr  ge, r1, 0x80000000, +1', 'Value out of range for s32'),
+    BadAsmTest('Immediate too big', 'jr  sgt, r1, -0x80000001, +1', 'Value out of range for s32'),
+    BadAsmTest('Jump with bogus cc', 'jr  foo, r1, 0, +1', 'Bad jump op foo'),
+    BadAsmTest('jr cc, imm, imm', 'jr nz, 0, 0, +0', 'jr cc,imm,... illegal'),
+    BadAsmTest('Offset where imm expected', 'jr nz, r0, +0, +0', 'Bad direct operand +0'),
+
+    #  Conditional, BPF_X
+    AsmTest('Compare register and jump', """
+        jr  ne, r1, r2, +1.b
+        jr  <, r3.b, r4.w, -1.q ; .sz are ignored so don't have to match
+        jr  sge, r0, fp, +0
+    """, [
+        (0x5d, 1, 2, 1, 0),
+        (0xad, 3, 4, -1, 0),
+        (0x7d, 0, 10, 0, 0),
+    ]),
+
+    BadAsmTest('jr cc, imm, reg', 'jr nz, 0, r0, +0', 'jr cc,imm,... illegal'),
+    BadAsmTest('Jump dst [ptr]', 'jr nz, [r0], r1, +0', 'Bad direct operand [r0]'),
+    BadAsmTest('Jump src [ptr]', 'jr nz, r0, [r1], +0', 'Bad direct operand [r1]'),
 
 ]
 
