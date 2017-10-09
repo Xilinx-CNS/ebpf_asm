@@ -224,6 +224,8 @@ class ProgAssembler(BaseAssembler):
                 d['reg'] = 10
             else:
                 d['reg'] = int(m.group(1), 10)
+                if d['reg'] not in range(11):
+                    raise Exception("Bad register", operand)
             return d
         try:
             d.update(self.parse_immediate(operand))
