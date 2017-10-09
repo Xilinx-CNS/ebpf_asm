@@ -566,6 +566,8 @@ AllTests = [
         ld  [r4+r1], 1 ; can't be a register, so must be an equate
         ld  [r5], foo.b ; resolves to foo
         ld  [r6], foo.b.b ; resolves to foo.b
+        .equ    foo, 6 ; redefining equates is allowed
+        ld  r1, foo
     """, [
         (0x18, 1, 0, 0, 1),
         (0, 0, 0, 0, 0),
@@ -574,6 +576,8 @@ AllTests = [
         (0x7a, 4, 0, -1, 1),
         (0x72, 5, 0, 0, 1),
         (0x72, 6, 0, 0, 2),
+        (0x18, 1, 0, 0, 6),
+        (0, 0, 0, 0, 0),
     ]),
 
     BadAsmTest('Size suffix stripping from equate', """
@@ -585,6 +589,7 @@ AllTests = [
         ld  [r1], foo.b.b.b
     """, 'Bad direct operand foo.b.b'),
     BadAsmTest('Size suffix on equate value', '.equ foo, 1.b', 'Bad immediate 1.b'),
+
 ]
 
 def run_testset(tests, verbose=False):

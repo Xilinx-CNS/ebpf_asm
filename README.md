@@ -69,6 +69,9 @@ An equate can be defined with a `name` that ends in a size suffix, but accessing
 the equate in a context where a size suffix would be allowed will require using
 **two** size suffixes.  This is also confusing, so don't do this either!
 
+An equate can be redefined; the new value takes effect from the following line.
+This could also be confusing, so maybe you shouldn't do it.
+
 ### Labels
 
 A label consists of a sequence of alphanumeric characters followed by a colon
