@@ -248,3 +248,30 @@ BadAsmTest('Displacement too big', 'ldpkt r0, [r1-0x80000001]', 'Value out of ra
 BadAsmTest('64-bit ldpkt', 'ldpkt r0.q, [r1]', 'ldpkt .q illegal').run_test()
 BadAsmTest('Size mismatch in LD_IND', 'ldpkt r0.q, [r1].l', 'Mismatched sizes').run_test()
 BadAsmTest('Size inside LD_IND indirection', 'ldpkt r0, [r1.l]', 'Bad size in indirect operand').run_test()
+
+# xadd
+
+BadAsmTest('Too few args to xadd', 'xadd [r0+0]', 'Bad xadd, expected 2 args').run_test()
+BadAsmTest('Too many args to xadd', 'xadd [r0+0], r0, 0', 'Bad xadd, expected 2 args').run_test()
+BadAsmTest('xadd missing indirection', 'xadd r0, r1', 'xadd direct_operand,... illegal').run_test()
+BadAsmTest('xadd missing indirection', 'xadd r0+0, r1', 'Bad direct operand r0+0').run_test()
+BadAsmTest('xadd indirect src', 'xadd [r0], [r1]', 'Bad direct operand [r1]').run_test()
+
+AsmTest('xadd', """
+    xadd    [r0], r1
+    xadd    [r1+0x7fff].l, r3
+    xadd    [r1-2], r3.l
+    xadd    [r1+-0x8000].l, r3.l
+""", [
+    (0xdb, 0, 1, 0, 0),
+    (0xc3, 1, 3, 32767, 0),
+    (0xc3, 1, 3, -2, 0),
+    (0xc3, 1, 3, -32768, 0),
+]).run_test()
+
+BadAsmTest('Extraneous + before disp', 'xadd [r0++2], r1', 'Bad immediate +2').run_test()
+BadAsmTest('Displacement too big', 'xadd [r1+0x8000], r0', 'Value out of range for s16').run_test()
+BadAsmTest('Displacement too big', 'xadd [r1-0x8001], r0', 'Value out of range for s16').run_test()
+BadAsmTest('Size mismatch in xadd', 'xadd [r1].q, r0.l', 'Mismatched sizes').run_test()
+BadAsmTest('Word-sized xadd', 'xadd [r0].w, r1', 'Bad size w for xadd').run_test()
+BadAsmTest('Byte-sized xadd', 'xadd [r0], r1.b', 'Bad size b for xadd').run_test()
