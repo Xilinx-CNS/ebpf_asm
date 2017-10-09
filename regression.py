@@ -344,6 +344,29 @@ AllTests = [
     BadAsmTest('Jump dst [ptr]', 'jr nz, [r0], r1, +0', 'Bad direct operand [r0]'),
     BadAsmTest('Jump src [ptr]', 'jr nz, r0, [r1], +0', 'Bad direct operand [r1]'),
 
+    # Function calls
+
+    BadAsmTest('Missing arg to call', 'call', 'Bad call, expected 1 arg'),
+    BadAsmTest('Too many args to call', 'call 1, 2', 'Bad call, expected 1 arg'),
+
+    AsmTest('Function calls', """
+        call    011 ; let's test octal while we're here
+        call    bpf_map_update_elem.b ; size suffix ignored
+        call    0x7fffffff
+        call    -0x80000000
+    """, [
+        (0x85, 0, 0, 0, 9),
+        (0x85, 0, 0, 0, 2),
+        (0x85, 0, 0, 0, (1 << 31) - 1),
+        (0x85, 0, 0, 0, -(1 << 31)),
+    ]),
+
+    BadAsmTest('Immediate too big', 'call 0x80000000', 'Value out of range for s32'),
+    BadAsmTest('Immediate too big', 'call -0x80000001', 'Value out of range for s32'),
+    BadAsmTest('Offset where imm expected', 'call +0', 'Bad immediate +0'),
+    BadAsmTest('Call undefined function', 'call undefined', 'Bad immediate undefined'),
+    BadAsmTest('Call register', 'call r0', 'Bad immediate r0'),
+
 ]
 
 def run_testset(tests, verbose=False):
