@@ -130,9 +130,6 @@ class BaseAssembler(object):
     _hex_re = re.compile(r'0x[0-9a-fA-F]+$')
     def parse_immediate(self, imm):
         d = {}
-        if self._size_re.search(imm):
-            d['size'] = imm[-1]
-            imm = imm[:-2]
         neg = False
         if imm.startswith('-'):
             neg = True
@@ -360,6 +357,10 @@ class ProgAssembler(BaseAssembler):
         if cc not in self.jr_conds:
             raise Exception("Bad jump op", cc)
         dst, src = map(self.parse_direct_operand, args[1:3])
+        if 'size' in dst: # compares always use full quad size
+            raise Exception("Bad size in jump dst", args[1])
+        if 'size' in src: # compares always use full quad size
+            raise Exception("Bad size in jump src", args[2])
         off = self.parse_offset(args[3])
         return {'op': 'jr', 'cc': self.jr_conds[cc], 'dst': dst, 'src': src,
                 'off': off}

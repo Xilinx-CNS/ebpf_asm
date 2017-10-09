@@ -141,14 +141,12 @@ AllTests = [
         ld  r1, 2
         ld  r2, 0x7fffffff.l
         ld  r3.q, 0x7fffffff00000001
-        ld  r1, 3.l.b ; double-suffix bug
     """, [
         (0x18, 1, 0, 0, 2),
         (0, 0, 0, 0, 0),
         (0xb4, 2, 0, 0, (1<<31) - 1),
         (0x18, 3, 0, 0, 1),
         (0, 0, 0, 0, (1<<31) - 1),
-        (0xb4, 1, 0, 0, 3),
     ]),
 
     BadAsmTest('Size mismatch in ld reg, imm', 'ld r0.l, 1.q', 'Mismatched sizes'),
@@ -161,6 +159,8 @@ AllTests = [
     BadAsmTest('Negative imm64', 'ld r0, -1', 'Value out of range for u64'),
     BadAsmTest('ld imm, reg', 'ld 0, r0', 'ld imm,... illegal'),
     BadAsmTest('Non-existent register', 'ld r11, 0', 'Bad register r11'),
+    BadAsmTest('Double size suffix on ld dst', 'ld r0.l.q, 1', 'Bad direct operand r0.l'),
+    BadAsmTest('Double size suffix on ld src_imm', 'ld r0, 1.l.q', 'Bad direct operand 1.l'),
 
     AsmTest('ld reg, reg', """
         ld  r1, r2
@@ -180,6 +180,7 @@ AllTests = [
     BadAsmTest('Word-sized ld reg, imm', 'ld r0.w, r1', 'Bad size w for register load'),
     BadAsmTest('Byte-sized ld reg, imm', 'ld r0, r1.b', 'Bad size b for register load'),
     BadAsmTest('Offset operand without indirection', 'ld r0, r1+1', 'Bad direct operand r1+1'),
+    BadAsmTest('Double size suffix on ld src_reg', 'ld r0, r1.l.q', 'Bad direct operand r1.l'),
 
     # Register-to-memory loads
 
@@ -191,12 +192,11 @@ AllTests = [
 
     AsmTest('ld [ptr], imm', """
         ld  [r1], 2
-        ld  [r1+0x7fff.b].l, 2 ; size suffixes on disp are ignored
-        ld  [r0+1.q], 2.w ; ... even if they're bigger than .w
+        ld  [r1+0x7fff].l, 2
+        ld  [r0+1], 2.w
         ld  [r0-0x8000].b, -2.b
         ld  [r0], 0x7fffffff
         ld  [r0], -0x80000000
-        ld  [r1], 4.w.b ; double-suffix bug
     """, [
         (0x7a, 1, 0, 0, 2),
         (0x62, 1, 0, 32767, 2),
@@ -204,7 +204,6 @@ AllTests = [
         (0x72, 0, 0, -32768, -2),
         (0x7a, 0, 0, 0, (1<<31) - 1),
         (0x7a, 0, 0, 0, -(1<<31)),
-        (0x6a, 1, 0, 0, 4),
     ]),
 
     BadAsmTest('Size mismatch in ld [ptr], imm', 'ld [r0].l, 1.q', 'Mismatched sizes'),
@@ -212,13 +211,14 @@ AllTests = [
     BadAsmTest('Immediate too big', 'ld [r0], 0x80000000', 'Value out of range for s32'),
     BadAsmTest('Offset too big', 'ld [r0+0x8000], 1', 'Value out of range for s16'),
     BadAsmTest('Offset too big', 'ld [r0-0x8001], 1', 'Value out of range for s16'),
-    BadAsmTest('Double size suffix', 'ld [r0+1.b.b], 1', 'Bad immediate 1.b'),
+    BadAsmTest('Size suffix on displacement', 'ld [r0+1.b], 1', 'Bad immediate 1.b'),
+    BadAsmTest('Double size suffix on ld src_imm', 'ld [r0], 4.w.b', 'Bad direct operand 4.w'),
 
     AsmTest('ld [ptr], reg', """
         ld  [r1], r2
         ld  [r1+2].l, r3
         ld  [r1-2], r3.w
-        ld  [fp-1.b].b, r3.b
+        ld  [fp-1].b, r3.b
     """, [
         (0x7b, 1, 2, 0, 0),
         (0x63, 1, 3, 2, 0),
@@ -228,6 +228,7 @@ AllTests = [
 
     BadAsmTest('Size mismatch in ld [ptr], reg', 'ld [r0].l, r1.q', 'Mismatched sizes'),
     BadAsmTest('Offset operand without indirection', 'ld [r0], r1+1', 'Bad direct operand r1+1'),
+    BadAsmTest('Double size suffix on ld src_reg', 'ld [r0], r1.w.b', 'Bad direct operand r1.w'),
 
     # Memory-to-register loads
 
@@ -241,7 +242,7 @@ AllTests = [
         ld  r2, [r1]
         ld  r3, [r1+2].l
         ld  r3.w, [r1-2]
-        ld  r3.b, [fp-1.b].b
+        ld  r3.b, [fp-1].b
     """, [
         (0x79, 2, 1, 0, 0),
         (0x61, 3, 1, 2, 0),
@@ -254,6 +255,8 @@ AllTests = [
     BadAsmTest('Offset too big', 'ld r1, [r0-0x8001]', 'Value out of range for s16'),
     BadAsmTest('Size mismatch in ld reg, [ptr]', 'ld r1.q, [r0].l', 'Mismatched sizes'),
     BadAsmTest('Offset operand without indirection', 'ld r1+1, [r0]', 'Bad direct operand r1+1'),
+    BadAsmTest('Double size suffix on ld dst', 'ld r0.w.b, [r1]', 'Bad direct operand r0.w'),
+    BadAsmTest('Size suffix on displacement', 'ld r0, [fp-1.b]', 'Bad immediate 1.b'),
 
     # ldpkt
 
@@ -282,12 +285,13 @@ AllTests = [
     BadAsmTest('64-bit ldpkt', 'ldpkt r0.q, [0]', 'ldpkt .q illegal'),
     BadAsmTest('Size mismatch in LD_ABS', 'ldpkt r0.q, [0].l', 'Mismatched sizes'),
     BadAsmTest('Size inside LD_ABS indirection', 'ldpkt r0, [0.l]', 'Bad size in indirect operand'),
+    BadAsmTest('Size suffix on displacement', 'ldpkt r0, [-1.b]', 'Bad size in indirect operand'),
 
     #  LD_IND
     AsmTest('LD_IND (ldpkt)', """
         ldpkt   r0, [r1]
         ldpkt   r0.w, [r1+-2] ; that +- isn't pretty but we allow it
-        ldpkt   r0, [r2-0x80000000.b].b ; size suffixes on disp are ignored
+        ldpkt   r0, [r2-0x80000000].b
         ldpkt   r0.l, [r2+0x7fffffff].l
     """, [
         (0x40, 0, 1, 0, 0),
@@ -303,6 +307,7 @@ AllTests = [
     BadAsmTest('64-bit ldpkt', 'ldpkt r0.q, [r1]', 'ldpkt .q illegal'),
     BadAsmTest('Size mismatch in LD_IND', 'ldpkt r0.q, [r1].l', 'Mismatched sizes'),
     BadAsmTest('Size inside LD_IND indirection', 'ldpkt r0, [r1.l]', 'Bad size in indirect operand'),
+    BadAsmTest('Size suffix on displacement', 'ldpkt r0, [r1-1.b]', 'Bad immediate 1.b'),
 
     # xadd
 
@@ -354,14 +359,15 @@ AllTests = [
     BadAsmTest('Jump to undefined label', 'jr undefined', 'Undefined symbol undefined'),
     BadAsmTest('Jump offset missing +', 'jr 1', 'Bad jump offset (missing + sign?)'),
     BadAsmTest('Jump offset with two + signs', 'jr ++1', 'Bad immediate +1'),
+    BadAsmTest('Size suffix on jump offset', 'jr +1.b', 'Bad immediate 1.b'),
 
     #  Conditional, BPF_K
     AsmTest('Compare immediate and jump', """
         jr  z, r1, 0, +1
         label:
         jr  gt, r1, 0x7fffffff, +2
-        jr  eq, r1, -0x80000000.q, label
-        jr  &, r1, 1.b, -1.b
+        jr  eq, r1, -0x80000000, label
+        jr  &, r1, 1, -1
         jr  sle, fp, 0, +-1 ; that +- isn't pretty but we allow it
     """, [
         (0x15, 1, 0, 1, 0),
@@ -376,11 +382,14 @@ AllTests = [
     BadAsmTest('Jump with bogus cc', 'jr  foo, r1, 0, +1', 'Bad jump op foo'),
     BadAsmTest('jr cc, imm, imm', 'jr nz, 0, 0, +0', 'jr cc,imm,... illegal'),
     BadAsmTest('Offset where imm expected', 'jr nz, r0, +0, +0', 'Bad direct operand +0'),
+    BadAsmTest('Size suffix on compare dst_reg', 'jr z, r0.l, 1, +1', 'Bad size in jump dst'),
+    BadAsmTest('Size suffix on compare immediate', 'jr z, r0, 1.l, +1', 'Bad size in jump src'),
+    BadAsmTest('Size suffix on jump offset', 'jr nz, r0, 1, +1.b', 'Bad immediate 1.b'),
 
     #  Conditional, BPF_X
     AsmTest('Compare register and jump', """
-        jr  ne, r1, r2, +1.b
-        jr  <, r3.b, r4.w, -1.q ; .sz are ignored so don't have to match
+        jr  ne, r1, r2, +1
+        jr  <, r3, r4, -1
         jr  sge, r0, fp, +0
     """, [
         (0x5d, 1, 2, 1, 0),
@@ -391,6 +400,8 @@ AllTests = [
     BadAsmTest('jr cc, imm, reg', 'jr nz, 0, r0, +0', 'jr cc,imm,... illegal'),
     BadAsmTest('Jump dst [ptr]', 'jr nz, [r0], r1, +0', 'Bad direct operand [r0]'),
     BadAsmTest('Jump src [ptr]', 'jr nz, r0, [r1], +0', 'Bad direct operand [r1]'),
+    BadAsmTest('Size suffix on compare src_reg', 'jr z, r0, r1.l, +1', 'Bad size in jump src'),
+    BadAsmTest('Size suffix on jump offset', 'jr nz, r0, r1, +1.b', 'Bad immediate 1.b'),
 
     # Function calls
 
@@ -399,7 +410,7 @@ AllTests = [
 
     AsmTest('Function calls', """
         call    011 ; let's test octal while we're here
-        call    bpf_map_update_elem.b ; size suffix ignored
+        call    bpf_map_update_elem
         call    0x7fffffff
         call    -0x80000000
     """, [
@@ -414,6 +425,7 @@ AllTests = [
     BadAsmTest('Offset where imm expected', 'call +0', 'Bad immediate +0'),
     BadAsmTest('Call undefined function', 'call undefined', 'Bad immediate undefined'),
     BadAsmTest('Call register', 'call r0', 'Bad immediate r0'),
+    BadAsmTest('Size suffix on call number', 'call 1.b', 'Bad immediate 1.b'),
 
     # Program exit
 
@@ -543,7 +555,7 @@ AllTests = [
     BadAsmTest('Offset where imm expected', '.equ name, +0', 'Bad immediate +0'),
 
     AsmTest('Equates', """
-        .equ    foo, 1.b
+        .equ    foo, 1
         .equ    a b, foo
         .equ    :, -1
         .equ    r1, :
@@ -553,7 +565,7 @@ AllTests = [
         ld  r3, r1.l ; register name takes priority over equate name
         ld  [r4+r1], 1 ; can't be a register, so must be an equate
         ld  [r5], foo.b ; resolves to foo
-        ld  [r6], foo.b.b.b ; resolves to foo.b (we need three because reasons)
+        ld  [r6], foo.b.b ; resolves to foo.b
     """, [
         (0x18, 1, 0, 0, 1),
         (0, 0, 0, 0, 0),
@@ -566,8 +578,13 @@ AllTests = [
 
     BadAsmTest('Size suffix stripping from equate', """
         .equ    foo.b, 1
-        ld  [r1], foo.b
+        ld  [r1], foo.b ; 'foo' matches the _label_ref_re
     """, 'Value out of range for s32 foo'),
+    BadAsmTest('Size suffix stripping from equate', """
+        .equ    foo.b, 1
+        ld  [r1], foo.b.b.b
+    """, 'Bad direct operand foo.b.b'),
+    BadAsmTest('Size suffix on equate value', '.equ foo, 1.b', 'Bad immediate 1.b'),
 ]
 
 def run_testset(tests, verbose=False):

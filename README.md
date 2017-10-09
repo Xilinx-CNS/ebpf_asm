@@ -66,9 +66,8 @@ be immediates, not registers, will treat it as an equate.  This is potentially
 very confusing, so don't do this!
 
 An equate can be defined with a `name` that ends in a size suffix, but accessing
-the equate will require using two size suffixes (sometimes three, which is
-arguably a bug but not trivial to fix).  This is also confusing, so don't do
-this either!
+the equate in a context where a size suffix would be allowed will require using
+**two** size suffixes.  This is also confusing, so don't do this either!
 
 ### Labels
 
@@ -94,7 +93,8 @@ Literals normally must fit in a 32-bit signed integer, except for
 [`ld reg.q, imm`](#register-to-register).  Some instructions can also take
 memory references `[reg+disp]` for some operands.
 
-Operands can also include a _size suffix_, a dot `.` followed by a letter:
+Operands in many cases can also include a _size suffix_, a dot `.` followed by a
+letter:
 
 * `.b`  byte
 * `.w`  word (16 bits)
@@ -129,16 +129,13 @@ Known bug: `src_imm` can have two size suffixes; the first will be used.  E.g.
 `ld [ptr_reg+disp], src_imm`
 
 The displacement `disp` may be omitted (as `ld [ptr_reg], src`) or negative (as
-`ld [ptr_reg-disp], src`).  It is a signed 16-bit quantity (i.e. word)
-regardless of any size suffix.
+`ld [ptr_reg-disp], src`).  It is a signed 16-bit quantity (i.e. word) and does
+not accept a size suffix.
 
 A size suffix goes outside the brackets (as `ld [ptr_reg].sz, src`), not inside
 (since the pointer must always be full-sized).
 
 Regardless of size suffix, `src_imm` must fit in a signed 32-bit integer.
-
-Known bug: `src_imm` can have two size suffixes; the first will be used.  E.g.
-`ld [r1], 2.b.w` is an 8-bit load.
 
 ##### Memory-to-register
 
@@ -160,7 +157,8 @@ socket filter, sched\_cls and sched\_act programs.
 If both operands have size suffixes, they must match; if neither has, then,
 **unlike most other instructions**, long (`.l`) is assumed.  This is because
 these instructions, being holdovers from classic BPF, _do not have_ quad-sized
-forms (which would be rejected by the verifier).
+forms (which would be rejected by the verifier).  The displacement `disp` may be
+omitted from the latter form, and in either case does not accept a size suffix.
 
 There are other restrictions on its use: the destination register must be `r0`,
 `r6` must contain a pointer to the sk\_buff, and registers `r1`-`r5` are
@@ -184,7 +182,8 @@ Atomic memory add (BPF\_STX | BPF\_XADD).  The same notes apply to the
 
 The relative jump instruction, `jr offset` or `jr cc, dst, src, offset`, is used
 to jump elsewhere in the program.  `offset` may be either a signed literal (the
-`+` must be included for positive values) or a label name.
+`+` must be included for positive values) or a label name; it does not accept a
+size suffix.
 
 ##### Unconditional jump
 
@@ -210,7 +209,7 @@ immediate).  There are multiple synonyms for each condition.
 * `set`, `&`, `and`: Jump if the bitwise AND of `dst` and `src` is nonzero.
 
 Both `dst` and `src` registers are considered as quads (`.q`); a `src` immediate
-is considered a long (`.l`).  Explicit size suffixes are accepted but ignored.
+is considered a long (`.l`).  Explicit size suffixes are not accepted.
 
 #### call
 
@@ -218,7 +217,8 @@ is considered a long (`.l`).  Explicit size suffixes are accepted but ignored.
 
 In eBPF, calls are to helper functions identified by an integer (see defs.i),
 taking arguments `r1` to `r5` and returning in `r0`.  Consult the kernel's eBPF
-documentation for details.
+documentation for details.  The `helper_function_id` does not accept a size
+suffix.
 
 #### exit
 
@@ -254,8 +254,8 @@ if omitted, quad (`.q`) is assumed.
 `end be, dst_reg.sz`
 
 Converts the specified register between Little or Big Endian and CPU endianness.
-Size must be one of quad (`.q`), long (`.l`) or word (`.w`); if omitted, quad
-(`.q`) is assumed.
+Size `.sz` must be one of quad (`.q`), long (`.l`) or word (`.w`); if omitted,
+quad (`.q`) is assumed.
 The same operation is used for conversions both from and to CPU endianness.
 
 ### Map definitions
