@@ -210,6 +210,10 @@ Size must be either quad (`.q`) or long (`.l`).  If both operands have size
 suffixes, they must match; if neither has, then quad (`.q`) is assumed.
 `src_imm` is a signed 32-bit quantity, even when size is quad (`.q`).
 
+Note the slight oddity that even for `lsh`, `rsh`, `arsh` instructions (where
+the size of the source operand should be irrelevant), the size suffix rules
+still apply - e.g. `lsh r1, 2.l` is a 32-bit shift.
+
 #### neg
 
 `neg dst_reg`

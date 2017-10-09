@@ -372,6 +372,100 @@ AllTests = [
     BadAsmTest('Too many args to exit', 'exit 1', 'Bad exit, expected no args'),
     AsmTest('exit', 'exit', [(0x95, 0, 0, 0, 0)]),
 
+    # ALU
+
+    #  binary ops
+    BadAsmTest('Too few args to ALU binary op', 'add r1', 'Bad add, expected 2 args'),
+    BadAsmTest('Too many args to ALU binary op', 'sub r1, r2, r3', 'Bad sub, expected 2 args'),
+
+    AsmTest('ALU binary ops, BPF_K', """
+        add r1, 2
+        sub r2, 0x7fffffff
+        and r3, -0x80000000
+        xor r4.l, 1
+        lsh r5, 03.l ; this treats r5 as a .l, which is slightly odd
+        mod r6.l, 0x10.l
+        arsh    fp, 1.q
+    """, [
+        (0x07, 1, 0, 0, 2),
+        (0x17, 2, 0, 0, (1 << 31) - 1),
+        (0x57, 3, 0, 0, -(1 << 31)),
+        (0xa4, 4, 0, 0, 1),
+        (0x64, 5, 0, 0, 3),
+        (0x94, 6, 0, 0, 16),
+        (0xc7, 10, 0, 0, 1),
+    ]),
+
+    BadAsmTest('ALU indirect dst', 'add [r1], 0', 'Bad direct operand [r1]'),
+    BadAsmTest('ALU immediate dst', 'or 1, 0', 'or imm,... illegal'),
+    BadAsmTest('Immediate too big', 'mul r1, 0x80000000', 'Value out of range for s32'),
+    BadAsmTest('Immediate too big', 'div r1, -0x80000001', 'Value out of range for s32'),
+    BadAsmTest('Word-sized ALU', 'add r0.w, 1', 'Bad size w for ALU op'),
+    BadAsmTest('Byte-sized ALU', 'add r0.b, 1', 'Bad size b for ALU op'),
+    BadAsmTest('Size mismatch in ALU reg, imm', 'add r0.q, 0.l', 'Mismatched sizes'),
+    BadAsmTest('Offset where imm expected', 'add r1, +0', 'Bad direct operand +0'),
+
+    AsmTest('ALU binary ops, BPF_X', """
+        or  r1, r2
+        mul r3.l, r4
+        rsh r5, r6.l
+        div r7.l, r8.l
+        add r9, fp.q
+    """, [
+        (0x4f, 1, 2, 0, 0),
+        (0x2c, 3, 4, 0, 0),
+        (0x7c, 5, 6, 0, 0),
+        (0x3c, 7, 8, 0, 0),
+        (0x0f, 9, 10, 0, 0),
+    ]),
+
+    BadAsmTest('ALU indirect dst', 'add [r1], r0', 'Bad direct operand [r1]'),
+    BadAsmTest('ALU immediate dst', 'xor 1, r0', 'xor imm,... illegal'),
+    BadAsmTest('Word-sized ALU', 'add r0.w, r1', 'Bad size w for ALU op'),
+    BadAsmTest('Byte-sized ALU', 'add r0.b, r1', 'Bad size b for ALU op'),
+    BadAsmTest('Size mismatch in ALU reg, imm', 'add r0.q, r1.l', 'Mismatched sizes'),
+
+    #  unary op (neg)
+    BadAsmTest('Too few args to neg', 'neg', 'Bad neg, expected 1 arg'),
+    BadAsmTest('Too many args to neg', 'neg r1, 0', 'Bad neg, expected 1 arg'),
+
+    AsmTest('ALU unary neg', """
+        neg r1
+        neg r2.l
+        neg fp.q
+    """, [
+        (0x87, 1, 0, 0, 0),
+        (0x84, 2, 0, 0, 0),
+        (0x87, 10, 0, 0, 0),
+    ]),
+
+    BadAsmTest('neg immediate dst', 'neg 1', 'neg imm illegal'),
+    BadAsmTest('neg indirect dst', 'neg [r1]', 'Bad direct operand [r1]'),
+    BadAsmTest('Word-sized neg', 'neg r0.w', 'Bad size w for ALU op'),
+    BadAsmTest('Byte-sized neg', 'neg r0.b', 'Bad size b for ALU op'),
+
+    #  endianness op
+    BadAsmTest('Too few args to end', 'end le', 'Bad end, expected 2 args'),
+    BadAsmTest('Too many args to end', 'end le, r1.w, r2', 'Bad end, expected 2 args'),
+
+    AsmTest('Endianness op', """
+        end le, r1
+        end be, r2.w
+        end le, fp.q
+        end le, r3.l
+    """, [
+        (0xd4, 1, 0, 0, 64),
+        (0xdc, 2, 0, 0, 16),
+        (0xd4, 10, 0, 0, 64),
+        (0xd4, 3, 0, 0, 32),
+    ]),
+
+    BadAsmTest('end immediate dst', 'end le, 1', 'end ..., imm illegal'),
+    BadAsmTest('end indirect dst', 'end le, [r1]', 'Bad direct operand [r1]'),
+    BadAsmTest('Byte-sized end', 'end le, r0.b', 'Bad size b for endian op'),
+    BadAsmTest('Bad endian direction', 'end r1, r2', 'Bad end, expected le or be'),
+    BadAsmTest('Size on endian direction', 'end le.l, r0', 'Bad end, expected le or be'),
+
 ]
 
 def run_testset(tests, verbose=False):
