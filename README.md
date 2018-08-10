@@ -21,7 +21,8 @@ dislike AT&T-syntax x86 assembly, this may not be the tool for you.
 
 `ebpf_asm` itself and the supplied header files (`defs.i` and `net_hdrs.i`) are
 provided under the MIT license (see comment block at the top of `ebpf_asm.py`).
-The included example programs (`test.s` and `dropper.s`) are dual MIT/GPL.
+The included example programs (`test.s`, `dropper.s` and `call.s`) are dual
+MIT/GPL.
 
 ## Syntax
 
@@ -213,12 +214,40 @@ is considered a long (`.l`).  Explicit size suffixes are not accepted.
 
 #### call
 
+##### Helper function
+
 `call helper_function_id`
 
-In eBPF, calls are to helper functions identified by an integer (see defs.i),
-taking arguments `r1` to `r5` and returning in `r0`.  Consult the kernel's eBPF
-documentation for details.  The `helper_function_id` does not accept a size
-suffix.
+In eBPF, the original call instruction calls a helper function identified by an
+integer (see defs.i), taking arguments `r1` to `r5` and returning in `r0`; these
+registers are clobbered, while the remaining registers (`r6` to `r9` and `fp`)
+are preserved across the call.  Consult the kernel's eBPF documentation for
+details.  The `helper_function_id` does not accept a size suffix.
+
+##### BPF-to-BPF
+
+`call offset`
+
+Since Linux 4.16, eBPF programs can make calls to other functions within the
+same program.  Currently these must be statically linked; the kernel is unable
+to resolve the relocation entries at program load time.  Thus the `offset` to
+such a `call` instruction is similar to that on a `jr`.  However, since negative
+numbers are accepted as `helper_function_id`s, a call with a negative literal
+offset has to be written like `call +-1` to mark it as an `offset`.
+Thus, the possible forms of BPF-to-BPF call are as follows:
+
+`call label`
+
+`call +1`
+
+`call +-1`
+
+`call +equate`
+
+`call +-equate`
+
+In most circumstances, however, only the first (`label`) form is likely to be
+useful.  A simple example of usage can be found in the `call.s` sample program.
 
 #### exit
 
