@@ -156,6 +156,7 @@ class BaseAssembler(object):
     _label_re = re.compile('\s*(?=\D)(\w+):$')
 
 class ProgAssembler(BaseAssembler):
+    class PseudoCall(str): pass
     elf_flags = 'AX'
     def __init__(self, equates):
         super(ProgAssembler, self).__init__(equates)
@@ -194,6 +195,20 @@ class ProgAssembler(BaseAssembler):
             op, regs, off, imm = struct.unpack('<BBhi', self.section[index])
             off += offset
             self.section[index] = struct.pack('<BBhi', op, regs, off, imm)
+        # Apply and filter out build-time relocs (BPF_PSEUDO_CALL)
+        nrelocs = {}
+        for index in self.relocs:
+            symbol = self.relocs[index]
+            if not isinstance(symbol, self.PseudoCall):
+                nrelocs[index] = symbol
+                continue
+            if symbol not in self.symbols:
+                raise Exception("Undefined symbol", symbol)
+            offset = self.symbols[symbol] - index
+            op, regs, off, imm = struct.unpack('<BBhi', self.section[index])
+            imm += offset
+            self.section[index] = struct.pack('<BBhi', op, regs, off, imm)
+        self.relocs = nrelocs
     @property
     def binary(self):
         return ''.join(self.section)
@@ -378,11 +393,21 @@ class ProgAssembler(BaseAssembler):
         raise Exception("Bad jr, expected 1 or 4 args, got", args)
 
     def parse_call(self, op, args):
-        """call function ; implicit args"""
+        """call forms:
+
+        call function ; implicit args
+        call label_or_offset ; implicit args"""
         if len(args) != 1:
             raise Exception("Bad call, expected 1 arg, got", args)
-        imm = self.parse_immediate(args[0])['imm']
-        return {'op': 'call', 'function': imm}
+        try:
+            imm = self.parse_immediate(args[0])['imm']
+            return {'op': 'call', 'function': imm}
+        except:
+            try:
+                off = self.parse_offset(args[0])
+                return {'op': 'call', 'off': off}
+            except:
+                raise Exception("Bad call, expected function identifier, label or offset, but got", args[0])
 
     def parse_exit(self, op, args):
         if args:
@@ -561,6 +586,10 @@ class ProgAssembler(BaseAssembler):
         return {'class': 'jmp', 'op': 'ja', 'off': off}
 
     def generate_call(self, insn):
+        if 'off' in insn:
+            off = insn['off']
+            # BPF_PSEUDO_CALL = 1
+            return {'class': 'jmp', 'op': 'call', 'imm': off, 'src': 1}
         func = insn['function']
         return {'class': 'jmp', 'op': 'call', 'imm': func}
 
@@ -707,6 +736,14 @@ class ProgAssembler(BaseAssembler):
         off = insn.get('off', 0)
         if isinstance(off, (int, long)):
             self.check_s16(off)
+        if insn['op'] == 'call':
+            op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
+            if isinstance(insn['imm'], str):
+                insn['imm'] = self.PseudoCall(insn['imm'])
+            else:
+                self.check_s32(insn['imm'])
+            regs = insn.get('src', 0) << 4 # for BPF_PSEUDO_CALL
+            return (op, regs, 0, insn['imm'])
         if 'src' in insn: # JMP_REG
             op = self.classes[insn['class']] | self.BPF_X | self.jmp_ops[insn['op']]
             regs = (insn['src'] << 4) | insn['dst']
@@ -715,11 +752,6 @@ class ProgAssembler(BaseAssembler):
             op = self.classes[insn['class']] | self.BPF_K | self.jmp_ops[insn['op']]
             regs = insn.get('dst', 0)
             return (op, regs, off, self.check_s32(insn['imm']))
-        if insn['op'] == 'call':
-            op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
-            if not isinstance(insn['imm'], str):
-                self.check_s32(insn['imm'])
-            return (op, 0, 0, insn['imm'])
         # ja, exit
         op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
         return (op, 0, off, 0)
@@ -738,7 +770,7 @@ class ProgAssembler(BaseAssembler):
         if isinstance(fields[3], str):
             # relocation entry
             symbol_imm = fields[3]
-            fields = fields[:3] + (0,)
+            fields = fields[:3] + (-1,)
         return (struct.pack(endian+'BBhi', *fields), symbol_off, symbol_imm)
 
     def assemble_insn(self, insn, endian='<'):
