@@ -411,21 +411,36 @@ AllTests = [
     AsmTest('Function calls', """
         call    011 ; let's test octal while we're here
         call    bpf_map_update_elem
+    label:
         call    0x7fffffff
         call    -0x80000000
+        call    label ; BPF-to-BPF call with symbol resolution
+        .equ    joff, 2
+        call    joff ; helper call with literal operand
+        call    -joff ; helper call with literal operand
+        call    +joff ; BPF-to-BPF call with literal operand
+        call    +-joff ; BPF-to-BPF call with literal operand
+        call    +-0x80000000
     """, [
         (0x85, 0, 0, 0, 9),
         (0x85, 0, 0, 0, 2),
         (0x85, 0, 0, 0, (1 << 31) - 1),
         (0x85, 0, 0, 0, -(1 << 31)),
+        (0x85, 0, 1, 0, -3),
+        (0x85, 0, 0, 0, 2),
+        (0x85, 0, 0, 0, -2),
+        (0x85, 0, 1, 0, 2),
+        (0x85, 0, 1, 0, -2),
+        (0x85, 0, 1, 0, -(1 << 31)),
     ]),
 
     BadAsmTest('Immediate too big', 'call 0x80000000', 'Value out of range for s32'),
     BadAsmTest('Immediate too big', 'call -0x80000001', 'Value out of range for s32'),
-    BadAsmTest('Offset where imm expected', 'call +0', 'Bad immediate +0'),
-    BadAsmTest('Call undefined function', 'call undefined', 'Bad immediate undefined'),
-    BadAsmTest('Call register', 'call r0', 'Bad immediate r0'),
-    BadAsmTest('Size suffix on call number', 'call 1.b', 'Bad immediate 1.b'),
+    BadAsmTest('Call undefined function', 'call undefined', 'Undefined symbol undefined'),
+    BadAsmTest('Call register', 'call r0', 'Undefined symbol r0'), # just parsed as a label or equate
+    BadAsmTest('Call undefined offset', 'call +undefined', 'Bad call, expected function identifier, label or offset'),
+    BadAsmTest('Call label as offset', 'label:\ncall +label', 'Bad call, expected function identifier, label or offset'),
+    BadAsmTest('Size suffix on call number', 'call 1.b', 'Bad call, expected function identifier, label or offset'),
 
     # Program exit
 
