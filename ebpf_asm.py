@@ -1,5 +1,5 @@
 #!/usr/bin/python2
-# Copyright (c) 2017 Solarflare Communications Ltd
+# Copyright (c) 2017-2018 Solarflare Communications Ltd
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -23,6 +23,9 @@ import re
 import struct
 import ast
 import optparse
+import math
+
+import paren
 
 VERSION = None
 
@@ -791,8 +794,9 @@ class MapsAssembler(BaseAssembler):
     """
     map_flags = 'PL'
     elf_flags = 'WA'
-    def __init__(self, equates):
+    def __init__(self, equates, no_pin):
         super(MapsAssembler, self).__init__(equates)
+        self.no_pin = no_pin
         self.maps = {}
     def parse_map(self, args):
         if len(args) == 4:
@@ -800,6 +804,7 @@ class MapsAssembler(BaseAssembler):
         if len(args) != 5:
             raise Exception("Bad map defn, expected 4 or 5 args, got", args)
         typ, ks, vs, maxent, flags = args
+        kt, vt = None, None
         typ = self.parse_immediate(typ)['imm']
         ks = self.parse_immediate(ks)['imm']
         vs = self.parse_immediate(vs)['imm']
@@ -812,6 +817,14 @@ class MapsAssembler(BaseAssembler):
         return {'type': typ, 'key_size': ks, 'value_size': vs,
                 'max_entries': maxent, 'flags': flagv}
     def assemble_map(self, d):
+        # /* per tools/lib/bpf/libbpf.h */
+        # struct bpf_map_def {
+	    #   unsigned int type;
+	    #   unsigned int key_size;
+	    #   unsigned int value_size;
+	    #   unsigned int max_entries;
+	    #   unsigned int map_flags;
+        # };
         # /* per iproute2:include/bpf_elf.h */
         # struct bpf_elf_map {
         #   __u32 type;
@@ -823,9 +836,15 @@ class MapsAssembler(BaseAssembler):
         #   __u32 pinning; /* PIN_GLOBAL_NS == 2 */
         #   __u32 inner_id; /* We don't use this */
         #   __u32 inner_idx; /* We don't use this */
-        # };
-        return struct.pack('=7i', d['type'], d['key_size'], d['value_size'],
-                           d['max_entries'], d['flags'], 0, 2)
+        # bpftool doesn't support auto-pinning maps, and will reject an object
+        # file which tries to use bpf_elf_map.pinning.  So use --no-pin-maps
+        # when building objects for bpftool.
+        if self.no_pin:
+            return struct.pack('=5i', d['type'], d['key_size'], d['value_size'],
+                               d['max_entries'], d['flags'])
+        else:
+            return struct.pack('=7i', d['type'], d['key_size'], d['value_size'],
+                               d['max_entries'], d['flags'], 0, 2)
     def feed_line(self, line):
         name, _, args = line.strip().partition(': ')
         args = map(str.strip, args.split(','))
@@ -879,9 +898,223 @@ class DataAssembler(BaseAssembler):
     def binary(self):
         return self.section
 
+class BtfAssembler(BaseAssembler):
+    elf_flags = 'WA'
+    class BtfKind(object):
+        name_offset = 0
+        vlen = 0
+        ti = 0 # size or type id
+        members = None
+        def parse(self, args, asm):
+            raise NotImplementedError()
+        def assemble(self):
+            """struct btf_type {
+	            __u32 name_off;
+	            /* "info" bits arrangement
+	             * bits  0-15: vlen (e.g. # of struct's members)
+	             * bits 16-23: unused
+	             * bits 24-27: kind (e.g. int, ptr, array...etc)
+	             * bits 28-31: unused
+	             */
+	            __u32 info;
+	            /* "size" is used by INT, ENUM, STRUCT and UNION.
+	             * "size" tells the size of the type it is describing.
+	             *
+	             * "type" is used by PTR, TYPEDEF, VOLATILE, CONST and RESTRICT.
+	             * "type" is a type_id referring to another type.
+	             */
+	            union {
+		            __u32 size;
+		            __u32 type;
+	            };
+            };"""
+            info = (self.kind << 24) | (self.vlen & 0xffff)
+            return struct.pack('<3I', self.name_offset, info, self.ti)
+        @property
+        def tuple(self):
+            return ()
+        @property
+        def size(self):
+            raise NotImplementedError()
+    class BtfInt(BtfKind):
+        name = 'int'
+        kind = 1
+        encoding_flags = {'signed': 1 << 0, 'unsigned': 0,
+                          'char': 1 << 1,
+                          'bool': 1 << 2}
+        def parse(self, args, asm):
+            # int encoding nbits
+            self.encoding = 0
+            assert len(args) == 2, args
+            encoding = args[0]
+            if not isinstance(encoding, tuple):
+                encoding = (encoding,)
+            for flag in encoding:
+                assert flag in self.encoding_flags, flag
+                self.encoding |= self.encoding_flags[flag]
+            self.nbits = int(args[1])
+        @property
+        def tuple(self):
+            return (self.name, self.encoding, self.nbits)
+        def assemble(self):
+            # round up nbits/8 to power of two, to find size
+            bytes = (self.nbits - 1) >> 3
+            self.ti = 1
+            while bytes:
+                bytes >>= 1
+                self.ti <<= 1
+            hdr = super(BtfAssembler.BtfInt, self).assemble()
+            #define BTF_INT_ENCODING(VAL)	(((VAL) & 0x0f000000) >> 24)
+            #define BTF_INT_OFFSET(VAL)	    (((VAL  & 0x00ff0000)) >> 16)
+            #define BTF_INT_BITS(VAL)	    ((VAL)  & 0x000000ff)
+            # no support for offset field
+            intdata = (self.encoding << 24) | (self.nbits & 0xff)
+            return hdr + struct.pack('<I', intdata)
+        @property
+        def size(self):
+            return self.ti
+    class BtfStruct(BtfKind):
+        name = 'struct'
+        kind = 4
+        def parse(self, args, asm):
+            self.members = []
+            for memb in args:
+                typ = asm.parse_type(memb[0:1])
+                if isinstance(typ, int):
+                    ti = typ
+                else:
+                    for i,t in enumerate(asm.types):
+                        if t.tuple == self.typ.tuple:
+                            ti = i + 1
+                            break
+                    else:
+                        asm.types.append(typ)
+                        ti = len(asm.types)
+                name = memb[1]
+                self.members.append([name, ti, asm.types[ti]])
+            self.members = tuple(self.members)
+            self.vlen = len(self.members)
+        def assemble(self):
+            self.offset = 0
+            for memb in self.members:
+                memb.append(self.offset)
+                self.offset += memb[2].size
+            self.ti = self.size
+            hdr = super(BtfAssembler.BtfStruct, self).assemble()
+            for memb in self.members:
+                """struct btf_member {
+	                __u32	name_off;
+	                __u32	type;
+	                __u32	offset;	/* offset in bits */
+                };"""
+                hdr += struct.pack('<3I', memb[0], memb[1], memb[3])
+            return hdr
+        @property
+        def tuple(self):
+            return self.members
+        @property
+        def size(self):
+            return self.offset
+    class BtfTypedef(BtfKind):
+        name = 'typedef'
+        kind = 8
+        def parse(self, args, asm):
+            assert len(args) == 1, args
+            typ = args[0]
+            if not isinstance(typ, tuple):
+                typ = (typ,)
+            self.typ = asm.parse_type(typ)
+            if isinstance(self.typ, int):
+                self.ti = self.typ
+            else:
+                for i,t in enumerate(asm.types):
+                    if t.tuple == self.typ.tuple:
+                        self.ti = i + 1
+                        break
+                else:
+                    asm.types.append(self.typ)
+                    self.ti = len(asm.types)
+            self.typ = asm.types[self.ti - 1]
+        @property
+        def tuple(self):
+            return (self.name, self.ti)
+        @property
+        def size(self):
+            return self.typ.size
+    btf_kinds = {'int': BtfInt, 'struct': BtfStruct, 'typedef': BtfTypedef}
+    def __init__(self, equates):
+        super(BtfAssembler, self).__init__(equates)
+        self.types = []
+        self.named_types = {}
+    def parse_type(self, args):
+        base_type, args = args[0], args[1:]
+        if base_type in self.named_types:
+            assert not args, args
+            return self.named_types[base_type] + 1
+        assert base_type in self.btf_kinds, base_type
+        kind = self.btf_kinds[base_type]
+        typ = kind()
+        typ.parse(args, self)
+        return typ
+    def feed_line(self, line):
+        name, _, args = line.strip().partition(': ')
+        args = paren.parse_string(args)
+        if name in self.types:
+            raise Exception("Duplicate type", name)
+        t = self.parse_type(args)
+        self.named_types[name] = len(self.types)
+        self.types.append(t)
+    def resolve_symbols(self):
+        self.offsets = [0]
+        self.symbols = {}
+        types = ''
+        names = '\0'
+        for t in self.types:
+            if t.members:
+                for m in t.members:
+                    n,i,t = m
+                    m[0] = len(names)
+                    names += n + '\0'
+        for k, ti in self.named_types.iteritems():
+            t = self.types[ti]
+            t.name_offset = len(names)
+            names += k + '\0'
+        for t in self.types:
+            self.offsets.append(len(types))
+            types += t.assemble()
+        """struct btf_header {
+	        __u16	magic;
+	        __u8	version;
+	        __u8	flags;
+	        __u32	hdr_len;
+
+	        /* All offsets are in bytes relative to the end of this header */
+	        __u32	type_off;	/* offset of type section	*/
+	        __u32	type_len;	/* length of type section	*/
+	        __u32	str_off;	/* offset of string section	*/
+	        __u32	str_len;	/* length of string section	*/
+        };"""
+        hdr = struct.pack('<HBB5I', 0xeB9F, 1, 0, 24,
+                          0, len(types), len(types), len(names))
+        self.section = hdr + types + names
+        # dump section contents, for debugging
+        #for x in struct.unpack('<%dI' % (6 + len(types) / 4,), hdr + types):
+        #    print '%08x' % x
+        #print repr(names)
+    @property
+    def binary(self):
+        return ''.join(self.section)
+    @property
+    def length(self):
+        return len(self.binary)
+    @property
+    def relocs(self):
+        return {}
+
 class Assembler(BaseAssembler):
-    def __init__(self):
+    def __init__(self, no_pin):
         super(Assembler, self).__init__({})
+        self.no_pin = no_pin
         self.sections = {}
         self.section = None
         self.sectype = None
@@ -902,7 +1135,9 @@ class Assembler(BaseAssembler):
             raise Exception("Bad .section, expected 1 arg, got", args)
         name = args[0]
         if name == 'maps':
-            asm = MapsAssembler(self.equates)
+            asm = MapsAssembler(self.equates, self.no_pin)
+        elif name =='.BTF':
+            asm = BtfAssembler(self.equates)
         elif self.sectype is None:
             raise Exception("Must specify .text or .data before .section")
         else:
@@ -1058,7 +1293,7 @@ class ElfGenerator(object):
             if not isinstance(sec, ProgAssembler):
                 continue
             for sym in sec.symbols:
-                self.add_symbol(sym, False, s.idx, sec.symbols[sym])
+                self.add_symbol(sym, True, s.idx, sec.symbols[sym])
         self.locals = len(self.symbols)
         # GLOBAL symbols (from .data or maps sections)
         for section, sec in self.asm.sections.iteritems():
@@ -1143,6 +1378,7 @@ def parse_args():
     x = optparse.OptionParser(usage='%s srcfile [...] -o outfile',
                               version='%prog ' + VERSION if VERSION else None)
     x.add_option('-o', '--output', type='string', default='a.out')
+    x.add_option('--no-pin-maps', action='store_true')
     opts, args = x.parse_args()
     if not args:
         x.error('Missing srcfile(s).')
@@ -1150,7 +1386,7 @@ def parse_args():
 
 if __name__ == '__main__':
     opts, args = parse_args()
-    asm = Assembler()
+    asm = Assembler(opts.no_pin_maps)
     for src in args:
         with open(src, 'r') as srcf:
             for line in srcf:

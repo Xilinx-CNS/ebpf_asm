@@ -313,6 +313,11 @@ maximum number of entries this map can hold.
 Consult the kernel documentation for details of these flags and of the various
 map types.
 
+Normally, maps will be auto-pinned when the program is loaded.  But unlike
+`iproute2`, `bpftool` doesn't support auto-pinning and will reject object files
+which request this in the map metadata.  So, the ebpf_asm command-line option
+`--no-pin-maps` can be used to suppress this.
+
 ### Data definitions
 
 As it is not possible to reference .data sections from eBPF code, they have
@@ -336,6 +341,9 @@ _license:
 The assembler generates ELF object files, suitable for passing to standard tools
 like iproute2's `ip link set dev ethX xdp obj object-file.o verb`.  Currently
 only little-endian output (aka 'bpfel') is supported.
+If using the `bpftool` utility from the kernel's `tools/lib/bpf`, as in
+`bpftool prog load object-file.o /sys/fs/bpf/xdp/name type xdp`, note that you
+will need to assemble with `--no-pin-maps` (see [maps](#map-definitions)).
 
 ## Testing
 
