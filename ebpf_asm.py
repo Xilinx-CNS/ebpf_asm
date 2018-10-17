@@ -936,6 +936,19 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             raise NotImplementedError()
+        def nested(self, arg, asm):
+            typ = asm.parse_type(arg)
+            if isinstance(typ, int):
+                ti = typ
+            else:
+                for i,t in enumerate(asm.types):
+                    if t.tuple == typ.tuple:
+                        ti = i + 1
+                        break
+                else:
+                    asm.types.append(typ)
+                    ti = len(asm.types)
+            return ti
     class BtfInt(BtfKind):
         name = 'int'
         kind = 1
@@ -973,25 +986,31 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.ti
+    class BtfPointer(BtfKind):
+        name = 'pointer'
+        kind = 2
+        def parse(self, args, asm):
+            assert len(args) == 1, args
+            typ = args[0]
+            if not isinstance(typ, tuple):
+                typ = (typ,)
+            self.ti = self.nested(typ, asm)
+            self.typ = asm.types[self.ti - 1]
+        @property
+        def tuple(self):
+            return (self.name, self.ti)
+        @property
+        def size(self):
+            return 8 # pointers are always 64 bits in eBPF
     class BtfStruct(BtfKind):
         name = 'struct'
         kind = 4
         def parse(self, args, asm):
             self.members = []
             for memb in args:
-                typ = asm.parse_type(memb[0:1])
-                if isinstance(typ, int):
-                    ti = typ
-                else:
-                    for i,t in enumerate(asm.types):
-                        if t.tuple == self.typ.tuple:
-                            ti = i + 1
-                            break
-                    else:
-                        asm.types.append(typ)
-                        ti = len(asm.types)
+                ti = self.nested(memb[0:1], asm)
                 name = memb[1]
-                self.members.append([name, ti, asm.types[ti]])
+                self.members.append([name, ti, asm.types[ti - 1]])
             self.members = tuple(self.members)
             self.vlen = len(self.members)
         def assemble(self):
@@ -1007,7 +1026,7 @@ class BtfAssembler(BaseAssembler):
 	                __u32	type;
 	                __u32	offset;	/* offset in bits */
                 };"""
-                hdr += struct.pack('<3I', memb[0], memb[1], memb[3])
+                hdr += struct.pack('<3I', memb[0], memb[1], memb[3] * 8)
             return hdr
         @property
         def tuple(self):
@@ -1023,17 +1042,7 @@ class BtfAssembler(BaseAssembler):
             typ = args[0]
             if not isinstance(typ, tuple):
                 typ = (typ,)
-            self.typ = asm.parse_type(typ)
-            if isinstance(self.typ, int):
-                self.ti = self.typ
-            else:
-                for i,t in enumerate(asm.types):
-                    if t.tuple == self.typ.tuple:
-                        self.ti = i + 1
-                        break
-                else:
-                    asm.types.append(self.typ)
-                    self.ti = len(asm.types)
+            self.ti = self.nested(typ, asm)
             self.typ = asm.types[self.ti - 1]
         @property
         def tuple(self):
@@ -1041,7 +1050,7 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.typ.size
-    btf_kinds = {'int': BtfInt, 'struct': BtfStruct, 'typedef': BtfTypedef}
+    btf_kinds = {'int': BtfInt, '*': BtfPointer, 'struct': BtfStruct, 'typedef': BtfTypedef}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = []
