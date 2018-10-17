@@ -965,7 +965,7 @@ class BtfAssembler(BaseAssembler):
             for flag in encoding:
                 assert flag in self.encoding_flags, flag
                 self.encoding |= self.encoding_flags[flag]
-            self.nbits = int(args[1])
+            self.nbits = asm.parse_immediate(args[1])['imm']
         @property
         def tuple(self):
             return (self.name, self.encoding, self.nbits)
@@ -1002,6 +1002,33 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return 8 # pointers are always 64 bits in eBPF
+    class BtfArray(BtfKind):
+        name = 'array'
+        kind = 3
+        def parse(self, args, asm):
+            assert len(args) == 2, args
+            typ = args[0]
+            if not isinstance(typ, tuple):
+                typ = (typ,)
+            self.et = self.nested(typ, asm)
+            self.typ = asm.types[self.et - 1]
+            # index type is always s64
+            self.it = self.nested(('int', 'signed', '64'), asm)
+            self.nmemb = asm.parse_immediate(args[1])['imm']
+        def assemble(self):
+            hdr = super(BtfAssembler.BtfArray, self).assemble()
+            """struct btf_array {
+               __u32   type;
+               __u32   index_type;
+               __u32   nelems;
+            };"""
+            return hdr + struct.pack('<3I', self.et, self.it, self.nmemb)
+        @property
+        def tuple(self):
+            return (self.name, self.ti, self.nmemb)
+        @property
+        def size(self):
+            return self.nmemb * self.typ.size
     class BtfStruct(BtfKind):
         name = 'struct'
         kind = 4
@@ -1050,7 +1077,8 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.typ.size
-    btf_kinds = {'int': BtfInt, '*': BtfPointer, 'struct': BtfStruct, 'typedef': BtfTypedef}
+    btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
+                 'struct': BtfStruct, 'typedef': BtfTypedef}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = []

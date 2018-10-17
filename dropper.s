@@ -46,6 +46,8 @@ ____btf_map_dropcnt: struct (__be32 key) (u32 value) ; define map type
 __le32: typedef (typedef (int signed 32)) ; gratuitous example of anonymous types
 char: int (char) 8 ; can't use (signed char) as kernel rejects combination
 ppi: *(*(int () 32)) ; pointer-to-pointer-to-int
+name: array (char) 4 ; the brackets are unnecessary but permitted
+names: struct (name first) (name last) ; mumble sizes
 
 .section maps
 ; __be32 ip.src => u32 counter
