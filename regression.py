@@ -118,6 +118,17 @@ AllTests = [
 
     ## PROGRAM TEXT
 
+    # Preprocessing
+
+    AsmTest('Comments', """
+        ; Text1
+        ; Text2
+    """, []),
+    AsmTest('Continuation in comment', """
+        ; Text1 \
+          Text2
+    """, []),
+
     # Bogus format
 
     BadAsmTest('Nonexistent insn', 'frob r0', 'Unrecognised instruction frob'),
@@ -445,7 +456,8 @@ AllTests = [
     # Program exit
 
     BadAsmTest('Too many args to exit', 'exit 1', 'Bad exit, expected no args'),
-    AsmTest('exit', 'exit', [(0x95, 0, 0, 0, 0)]),
+    # let's take the opportunity to test continuation lines in code, too
+    AsmTest('exit', 'ex\\\nit', [(0x95, 0, 0, 0, 0)]),
 
     # ALU
 
