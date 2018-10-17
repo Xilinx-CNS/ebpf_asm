@@ -1176,11 +1176,37 @@ class BtfAssembler(BaseAssembler):
     class BtfRestrict(BtfQualifier):
         name = 'restrict'
         kind = 11
+    class BtfFunc(BtfKind):
+        name = 'func'
+        kind = 12
+        def parse(self, args, asm):
+            typ = args[0]
+            if not isinstance(typ, tuple):
+                typ = (typ,)
+            self.ti = self.nested(typ, asm)
+            self.typ = asm.types[self.ti - 1]
+            self.params = tuple(self.nested((arg,), asm) for arg in args[1:])
+            self.vlen = len(self.params)
+        def assemble(self):
+            hdr = super(BtfAssembler.BtfFunc, self).assemble()
+            for pti in self.params:
+                hdr += struct.pack('<I', pti)
+            return hdr
+        @property
+        def tuple(self):
+            return (self.ti, self.params)
+        @property
+        def size(self):
+            raise Exception("Tried to take the size of a BTF %s" % (self.name,))
+    class BtfFuncProto(BtfFunc):
+        name = 'proto'
+        kind = 13
     btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
                  'struct': BtfStruct, 'union': BtfUnion, 'enum': BtfEnum,
                  '...': BtfForward, 'typedef': BtfTypedef,
                  'volatile': BtfVolatile, 'const': BtfConst,
-                 'restrict': BtfRestrict}
+                 'restrict': BtfRestrict, 'func': BtfFunc,
+                 'proto': BtfFuncProto}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = [self.BtfUnknown()]
