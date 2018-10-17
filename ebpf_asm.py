@@ -937,6 +937,8 @@ class BtfAssembler(BaseAssembler):
         def size(self):
             raise NotImplementedError()
         def nested(self, arg, asm):
+            if not isinstance(arg, tuple):
+                arg = (arg,)
             typ = asm.parse_type(arg)
             if isinstance(typ, int):
                 ti = typ
@@ -1035,7 +1037,7 @@ class BtfAssembler(BaseAssembler):
         def parse(self, args, asm):
             self.members = []
             for memb in args:
-                ti = self.nested(memb[0:1], asm)
+                ti = self.nested(memb[0], asm)
                 name = memb[1]
                 self.members.append([name, ti, asm.types[ti - 1]])
             self.members = tuple(self.members)
@@ -1061,6 +1063,37 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.offset
+    class BtfUnion(BtfKind):
+        name = 'union'
+        kind = 5
+        def parse(self, args, asm):
+            self.members = []
+            for memb in args:
+                ti = self.nested(memb[0], asm)
+                name = memb[1]
+                self.members.append([name, ti, asm.types[ti - 1]])
+            self.members = tuple(self.members)
+            self.vlen = len(self.members)
+        def assemble(self):
+            self.maxsize = 0
+            for memb in self.members:
+                self.maxsize = max(self.maxsize, memb[2].size)
+            self.ti = self.size
+            hdr = super(BtfAssembler.BtfUnion, self).assemble()
+            for memb in self.members:
+                """struct btf_member {
+	                __u32	name_off;
+	                __u32	type;
+	                __u32	offset;	/* offset in bits */
+                };"""
+                hdr += struct.pack('<3I', memb[0], memb[1], 0)
+            return hdr
+        @property
+        def tuple(self):
+            return self.members
+        @property
+        def size(self):
+            return self.maxsize
     class BtfTypedef(BtfKind):
         name = 'typedef'
         kind = 8
@@ -1078,7 +1111,8 @@ class BtfAssembler(BaseAssembler):
         def size(self):
             return self.typ.size
     btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
-                 'struct': BtfStruct, 'typedef': BtfTypedef}
+                 'struct': BtfStruct, 'union': BtfUnion,
+                 'typedef': BtfTypedef}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = []
