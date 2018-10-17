@@ -885,6 +885,7 @@ class Assembler(BaseAssembler):
         self.sections = {}
         self.section = None
         self.sectype = None
+        self.cont = ''
     def directive(self, d, args):
         if hasattr(self, 'do_' + d):
             getattr(self, 'do_' + d)(args)
@@ -930,6 +931,12 @@ class Assembler(BaseAssembler):
         val = self.parse_immediate(val)['imm']
         self.equates[name] = val
     def feed_line(self, line):
+        # handle continuation lines
+        line = self.cont + line.rstrip('\n')
+        if line and line[-1] == '\\':
+            self.cont = line[:-1]
+            return
+        self.cont = ''
         line = line.strip()
         if ';' in line: # comment to EOL
             line, _, _ = line.partition(';')

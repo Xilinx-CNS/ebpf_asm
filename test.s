@@ -9,7 +9,10 @@
 	ld	r2, fp
 	ld	r4.l, 0xfe
 	add	r0, r4
-	mul	r1, 4
+; Let's test writing \
+  continuation lines
+	mul	r1,\
+        4
 	neg	r2
 	ld	[r0].b, 12
 	ld	r1, bar

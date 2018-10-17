@@ -28,6 +28,11 @@ MIT/GPL.
 
 Comments are introduced with a semicolon `;` and continue to end of line.
 
+A backslash (`\`) at end of line indicates line continuation.  This remains the
+case even within comments, for example:
+`; This is all \`
+`  one comment`
+
 ### Directives
 
 #### .text
