@@ -992,11 +992,7 @@ class BtfAssembler(BaseAssembler):
         name = 'pointer'
         kind = 2
         def parse(self, args, asm):
-            assert len(args) == 1, args
-            typ = args[0]
-            if not isinstance(typ, tuple):
-                typ = (typ,)
-            self.ti = self.nested(typ, asm)
+            self.ti = self.nested(args, asm)
             self.typ = asm.types[self.ti - 1]
         @property
         def tuple(self):
@@ -1118,7 +1114,7 @@ class BtfAssembler(BaseAssembler):
             return hdr
         @property
         def tuple(self):
-            return (self._size, self.values)
+            return (self._size, self.members)
         @property
         def size(self):
             return self._size
@@ -1138,9 +1134,29 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.typ.size
+    class BtfQualifier(BtfKind):
+        def parse(self, args, asm):
+            self.ti = self.nested(args, asm)
+            self.typ = asm.types[self.ti - 1]
+        @property
+        def tuple(self):
+            return (self.name, self.ti)
+        @property
+        def size(self):
+            return self.typ.size
+    class BtfVolatile(BtfQualifier):
+        name = 'volatile'
+        kind = 9
+    class BtfConst(BtfQualifier):
+        name = 'const'
+        kind = 10
+    class BtfRestrict(BtfQualifier):
+        name = 'restrict'
+        kind = 11
     btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
                  'struct': BtfStruct, 'union': BtfUnion, 'enum': BtfEnum,
-                 'typedef': BtfTypedef}
+                 'typedef': BtfTypedef, 'volatile': BtfVolatile,
+                 'const': BtfConst, 'restrict': BtfRestrict}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = []
