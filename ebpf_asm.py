@@ -1094,6 +1094,34 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.maxsize
+    class BtfEnum(BtfKind):
+        name = 'enum'
+        kind = 6
+        def parse(self, args, asm):
+            self.members = []
+            self._size = asm.parse_immediate(args[0])['imm']
+            for arg in args[1:]:
+                name = arg[0]
+                value = asm.parse_immediate(arg[1])['imm']
+                self.members.append([name, value])
+            self.members = tuple(self.members)
+            self.vlen = len(self.members)
+        def assemble(self):
+            self.ti = self.size
+            hdr = super(BtfAssembler.BtfEnum, self).assemble()
+            for enum in self.members:
+                """struct btf_enum {
+	                __u32   name_off;
+	                __s32   val;
+                };"""
+                hdr += struct.pack('<2I', enum[0], enum[1])
+            return hdr
+        @property
+        def tuple(self):
+            return (self._size, self.values)
+        @property
+        def size(self):
+            return self._size
     class BtfTypedef(BtfKind):
         name = 'typedef'
         kind = 8
@@ -1111,7 +1139,7 @@ class BtfAssembler(BaseAssembler):
         def size(self):
             return self.typ.size
     btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
-                 'struct': BtfStruct, 'union': BtfUnion,
+                 'struct': BtfStruct, 'union': BtfUnion, 'enum': BtfEnum,
                  'typedef': BtfTypedef}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
@@ -1143,8 +1171,7 @@ class BtfAssembler(BaseAssembler):
         for t in self.types:
             if t.members:
                 for m in t.members:
-                    n,i,t = m
-                    m[0] = len(names)
+                    n, m[0] = m[0], len(names)
                     names += n + '\0'
         for k, ti in self.named_types.iteritems():
             t = self.types[ti]

@@ -49,6 +49,7 @@ ppi: *(*(int () 32)) ; pointer-to-pointer-to-int
 name: array (char) 4 ; the brackets are unnecessary but permitted
 names: struct (name first) (name last) ; mumble sizes
 ipv4: union (__be32 addr) ((array char 4) octets)
+xdprc: enum 4 (XDP_DROP XDP_DROP) (XDP_PASS XDP_PASS) (XDP_ABORTED 0) ; size (name value)
 
 .section maps
 ; __be32 ip.src => u32 counter
