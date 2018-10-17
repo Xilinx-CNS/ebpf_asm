@@ -945,12 +945,20 @@ class BtfAssembler(BaseAssembler):
             else:
                 for i,t in enumerate(asm.types):
                     if t.tuple == typ.tuple:
-                        ti = i + 1
+                        ti = i
                         break
                 else:
-                    asm.types.append(typ)
                     ti = len(asm.types)
+                    asm.types.append(typ)
             return ti
+    class BtfUnknown(BtfKind):
+        name = 'unknown'
+        kind = 0
+        def assemble(self):
+            return ''
+        @property
+        def tuple(self):
+            return (self.name,)
     class BtfInt(BtfKind):
         name = 'int'
         kind = 1
@@ -993,7 +1001,7 @@ class BtfAssembler(BaseAssembler):
         kind = 2
         def parse(self, args, asm):
             self.ti = self.nested(args, asm)
-            self.typ = asm.types[self.ti - 1]
+            self.typ = asm.types[self.ti]
         @property
         def tuple(self):
             return (self.name, self.ti)
@@ -1009,7 +1017,7 @@ class BtfAssembler(BaseAssembler):
             if not isinstance(typ, tuple):
                 typ = (typ,)
             self.et = self.nested(typ, asm)
-            self.typ = asm.types[self.et - 1]
+            self.typ = asm.types[self.et]
             # index type is always s64
             self.it = self.nested(('int', 'signed', '64'), asm)
             self.nmemb = asm.parse_immediate(args[1])['imm']
@@ -1035,7 +1043,7 @@ class BtfAssembler(BaseAssembler):
             for memb in args:
                 ti = self.nested(memb[0], asm)
                 name = memb[1]
-                self.members.append([name, ti, asm.types[ti - 1]])
+                self.members.append([name, ti, asm.types[ti]])
             self.members = tuple(self.members)
             self.vlen = len(self.members)
         def assemble(self):
@@ -1055,7 +1063,7 @@ class BtfAssembler(BaseAssembler):
             return hdr
         @property
         def tuple(self):
-            return self.members
+            return (self.name, self.members)
         @property
         def size(self):
             return self.offset
@@ -1067,7 +1075,7 @@ class BtfAssembler(BaseAssembler):
             for memb in args:
                 ti = self.nested(memb[0], asm)
                 name = memb[1]
-                self.members.append([name, ti, asm.types[ti - 1]])
+                self.members.append([name, ti, asm.types[ti]])
             self.members = tuple(self.members)
             self.vlen = len(self.members)
         def assemble(self):
@@ -1086,7 +1094,7 @@ class BtfAssembler(BaseAssembler):
             return hdr
         @property
         def tuple(self):
-            return self.members
+            return (self.name, self.members)
         @property
         def size(self):
             return self.maxsize
@@ -1114,7 +1122,7 @@ class BtfAssembler(BaseAssembler):
             return hdr
         @property
         def tuple(self):
-            return (self._size, self.members)
+            return (self.name, self._size, self.members)
         @property
         def size(self):
             return self._size
@@ -1127,7 +1135,7 @@ class BtfAssembler(BaseAssembler):
             if not isinstance(typ, tuple):
                 typ = (typ,)
             self.ti = self.nested(typ, asm)
-            self.typ = asm.types[self.ti - 1]
+            self.typ = asm.types[self.ti]
         @property
         def tuple(self):
             return (self.name, self.ti)
@@ -1137,7 +1145,7 @@ class BtfAssembler(BaseAssembler):
     class BtfQualifier(BtfKind):
         def parse(self, args, asm):
             self.ti = self.nested(args, asm)
-            self.typ = asm.types[self.ti - 1]
+            self.typ = asm.types[self.ti]
         @property
         def tuple(self):
             return (self.name, self.ti)
@@ -1159,13 +1167,13 @@ class BtfAssembler(BaseAssembler):
                  'const': BtfConst, 'restrict': BtfRestrict}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
-        self.types = []
-        self.named_types = {}
+        self.types = [self.BtfUnknown()]
+        self.named_types = {'void': 0}
     def parse_type(self, args):
         base_type, args = args[0], args[1:]
         if base_type in self.named_types:
             assert not args, args
-            return self.named_types[base_type] + 1
+            return self.named_types[base_type]
         assert base_type in self.btf_kinds, base_type
         kind = self.btf_kinds[base_type]
         typ = kind()
