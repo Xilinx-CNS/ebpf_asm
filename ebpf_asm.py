@@ -1130,11 +1130,7 @@ class BtfAssembler(BaseAssembler):
         name = 'typedef'
         kind = 8
         def parse(self, args, asm):
-            assert len(args) == 1, args
-            typ = args[0]
-            if not isinstance(typ, tuple):
-                typ = (typ,)
-            self.ti = self.nested(typ, asm)
+            self.ti = self.nested(args, asm)
             self.typ = asm.types[self.ti]
         @property
         def tuple(self):

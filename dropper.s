@@ -43,7 +43,7 @@ u32: int unsigned 32 ; int encoding nbits
 __be32: typedef u32 ; No support yet for endianness / __bitwise in BTF :-(
 ____btf_map_dropcnt: struct (__be32 key) (u32 value) ; define map type
 ; A bunch more types, just to test BTF support
-__le32: typedef (typedef (int signed 32)) ; gratuitous example of anonymous types
+__le32: typedef typedef int signed 32 ; gratuitous example of anonymous types
 char: int (char) 8 ; can't use (signed char) as kernel rejects combination
 ppi: * * int () 32 ; pointer-to-pointer-to-int
 name: array (char) 4 ; the brackets are unnecessary but permitted
