@@ -52,6 +52,9 @@ ipv4: union (__be32 addr) ((array char 4) octets)
 xdprc: enum 4 (XDP_DROP XDP_DROP) (XDP_PASS XDP_PASS) (XDP_ABORTED 0) ; size (name value)
 crpvi: const restrict (* volatile (u32)); const restrict pointer to volatile int
 memptr: * (void) ; pointer to void
+list: ... ; forward-declaration
+list: struct ((* list) next)
+forward: ... ; uncompleted fwd-declaration
 
 .section maps
 ; __be32 ip.src => u32 counter

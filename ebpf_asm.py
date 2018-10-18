@@ -1127,6 +1127,17 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self._size
+    class BtfForward(BtfKind):
+        name = 'forward'
+        kind = 7
+        def parse(self, args, asm):
+            assert not args, args
+        @property
+        def tuple(self):
+            return (self.name,)
+        @property
+        def size(self):
+            raise Exception("Tried to take size of a fwd declaration")
     class BtfTypedef(BtfKind):
         name = 'typedef'
         kind = 8
@@ -1160,8 +1171,9 @@ class BtfAssembler(BaseAssembler):
         kind = 11
     btf_kinds = {'int': BtfInt, '*': BtfPointer, 'array': BtfArray,
                  'struct': BtfStruct, 'union': BtfUnion, 'enum': BtfEnum,
-                 'typedef': BtfTypedef, 'volatile': BtfVolatile,
-                 'const': BtfConst, 'restrict': BtfRestrict}
+                 '...': BtfForward, 'typedef': BtfTypedef,
+                 'volatile': BtfVolatile, 'const': BtfConst,
+                 'restrict': BtfRestrict}
     def __init__(self, equates):
         super(BtfAssembler, self).__init__(equates)
         self.types = [self.BtfUnknown()]
@@ -1179,11 +1191,16 @@ class BtfAssembler(BaseAssembler):
     def feed_line(self, line):
         name, _, args = line.strip().partition(': ')
         args = paren.parse_string(args)
-        if name in self.types:
+        old = self.named_types.get(name)
+        if old is not None and not isinstance(self.types[old], self.BtfForward):
             raise Exception("Duplicate type", name)
         t = self.parse_type(args)
-        self.named_types[name] = len(self.types)
-        self.types.append(t)
+        if old is None:
+            self.named_types[name] = len(self.types)
+            self.types.append(t)
+        else:
+            # Overwrite forward-declaration
+            self.types[old] = t
     def resolve_symbols(self):
         self.offsets = [0]
         self.symbols = {}
