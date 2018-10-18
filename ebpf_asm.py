@@ -937,8 +937,9 @@ class BtfAssembler(BaseAssembler):
         def size(self):
             raise NotImplementedError()
         def nested(self, arg, asm):
-            if not isinstance(arg, tuple):
-                arg = (arg,)
+            if isinstance(arg[0], tuple):
+                assert len(arg) == 1, arg
+                arg = arg[0]
             typ = asm.parse_type(arg)
             if isinstance(typ, int):
                 ti = typ
@@ -1041,7 +1042,7 @@ class BtfAssembler(BaseAssembler):
         def parse(self, args, asm):
             self.members = []
             for memb in args:
-                ti = self.nested(memb[0], asm)
+                ti = self.nested(memb[0:1], asm)
                 name = memb[1]
                 self.members.append([name, ti, asm.types[ti]])
             self.members = tuple(self.members)
@@ -1073,7 +1074,7 @@ class BtfAssembler(BaseAssembler):
         def parse(self, args, asm):
             self.members = []
             for memb in args:
-                ti = self.nested(memb[0], asm)
+                ti = self.nested(memb[0:1], asm)
                 name = memb[1]
                 self.members.append([name, ti, asm.types[ti]])
             self.members = tuple(self.members)
