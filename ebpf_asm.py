@@ -936,6 +936,9 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             raise NotImplementedError()
+        @property
+        def size_bits(self):
+            return self.size * 8
         def nested(self, arg, asm):
             if isinstance(arg[0], tuple):
                 assert len(arg) == 1, arg
@@ -967,7 +970,7 @@ class BtfAssembler(BaseAssembler):
                           'char': 1 << 1,
                           'bool': 1 << 2}
         def parse(self, args, asm):
-            # int encoding nbits
+            # int encoding nbits [offset]
             self.encoding = 0
             assert len(args) == 2, args
             encoding = args[0]
@@ -981,12 +984,8 @@ class BtfAssembler(BaseAssembler):
         def tuple(self):
             return (self.name, self.encoding, self.nbits)
         def assemble(self):
-            # round up nbits/8 to power of two, to find size
-            bytes = (self.nbits - 1) >> 3
-            self.ti = 1
-            while bytes:
-                bytes >>= 1
-                self.ti <<= 1
+            # round up nbits/8
+            self.ti = (self.nbits + 7) / 8
             hdr = super(BtfAssembler.BtfInt, self).assemble()
             #define BTF_INT_ENCODING(VAL)	(((VAL) & 0x0f000000) >> 24)
             #define BTF_INT_OFFSET(VAL)	    (((VAL  & 0x00ff0000)) >> 16)
@@ -997,6 +996,9 @@ class BtfAssembler(BaseAssembler):
         @property
         def size(self):
             return self.ti
+        @property
+        def size_bits(self):
+            return self.nbits
     class BtfPointer(BtfKind):
         name = 'pointer'
         kind = 2
@@ -1048,11 +1050,16 @@ class BtfAssembler(BaseAssembler):
             self.members = tuple(self.members)
             self.vlen = len(self.members)
         def assemble(self):
-            self.offset = 0
+            bits_offset = 0
             for memb in self.members:
-                memb.append(self.offset)
-                self.offset += memb[2].size
-            self.ti = self.size
+                if bits_offset % 8:
+                    if not isinstance(memb[2], BtfAssembler.BtfInt):
+                        # bitfield over, pad to next byte
+                        bits_offset = (bits_offset & -8) + 8
+                memb.append(bits_offset)
+                bits_offset += memb[2].size_bits
+            # Size in bytes (round up)
+            self.ti = (bits_offset + 7) / 8
             hdr = super(BtfAssembler.BtfStruct, self).assemble()
             for memb in self.members:
                 """struct btf_member {
@@ -1060,14 +1067,14 @@ class BtfAssembler(BaseAssembler):
 	                __u32	type;
 	                __u32	offset;	/* offset in bits */
                 };"""
-                hdr += struct.pack('<3I', memb[0], memb[1], memb[3] * 8)
+                hdr += struct.pack('<3I', memb[0], memb[1], memb[3])
             return hdr
         @property
         def tuple(self):
             return (self.name, self.members)
         @property
         def size(self):
-            return self.offset
+            return self.ti
     class BtfUnion(BtfKind):
         name = 'union'
         kind = 5
