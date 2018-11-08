@@ -1034,7 +1034,7 @@ class BtfAssembler(BaseAssembler):
             return hdr + struct.pack('<3I', self.et, self.it, self.nmemb)
         @property
         def tuple(self):
-            return (self.name, self.ti, self.nmemb)
+            return (self.name, self.et, self.nmemb)
         @property
         def size(self):
             return self.nmemb * self.typ.size
