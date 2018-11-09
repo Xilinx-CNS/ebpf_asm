@@ -42,6 +42,52 @@ def print_btf_section(asm):
         else:
             print '%d: (anon) %s' % (i, t.tuple)
 
+class BtfMerger(object):
+    def __init__(self):
+        self.types = []
+    def merge(self, src):
+        # TODO handle names
+        src_types = list(t.tuple for t in src.types) # Decouple from src
+        refs = {} # src type_id => set of referenced src type_ids
+        id_map = {} # src type_id => our type_id, or set of tentatives
+        # First, pre-topologically sort src
+        visited = set() # temporary mark
+        consumed = list() # permanent mark, and result list
+        def visit(ti):
+            if ti in consumed: return
+            if ti in visited: return
+            visited.add(ti)
+            # Follow references.  Types are (with .tuple index of ref):
+            # 'int' no refs.
+            # 'pointer' [1]
+            # 'array' [1]
+            # 'struct' [1][*][1]
+            # 'union' [1][*][1]
+            # 'enum' no refs
+            # 'forward' no refs
+            # 'typedef' [1]
+            # 'volatile' [1]
+            # 'const' [1]
+            # 'restrict' [1]
+            t = src_types[ti]
+            if t[0] in ('pointer', 'array', 'typedef', 'volatile',
+                              'const', 'restrict'):
+                # Single referenced type in [1]
+                refs[ti] = set([t[1]])
+            elif t[0] in ('struct', 'union'):
+                # List of referenced types in [1][*][1]
+                refs[ti] = set(m[1] for m in t[1])
+            for ref in refs.get(ti, ()):
+                visit(ref)
+            consumed.append(ti)
+            return
+        for ti,_ in enumerate(src_types):
+            visit(ti)
+
+        for ti in consumed:
+            print ti, src_types[ti]
+        pass #XXX
+
 if __name__ == '__main__':
     """For each file named on the command line, we parse it as a .BTF section in
     ebpf_asm's format for BTF.  We then take the resulting information (which is
@@ -71,4 +117,10 @@ if __name__ == '__main__':
             freeze_references(asm)
             print "Input:", src
             print_btf_section(asm)
-    result = []
+
+    result = BtfMerger()
+    for src in sources:
+        print "Merging", src
+        result.merge(sources[src])
+    print "Result:"
+    print_btf_section(result)
