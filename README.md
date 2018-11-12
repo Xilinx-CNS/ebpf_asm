@@ -45,13 +45,16 @@ Following sections will consist of program data (currently just asciz strings).
 
 #### .section
 
-`.section maps` starts (or continues) the maps section, containing map
-definitions.
+`.section maps` starts (or continues) the maps section, containing
+[map definitions](#map-definitions).
+
+`.section .BTF` starts (or continues) the BTF section, containing
+[type definitions](#type-definitions).
 
 Otherwise, `.section name` starts (or continues) a section with the given name.
-This section will contain either text or data (depending on the last `.text` or
-`.data` directive) and will run until the next `.section`, `.text` or `.data`
-directive.
+This section will contain either text or [data](#data-definitions) (depending on
+the last `.text` or `.data` directive) and will run until the next `.section`,
+`.text` or `.data` directive.
 
 #### .include
 
@@ -335,6 +338,142 @@ snippet:
 _license:
     asciz   "GPL"
 ```
+
+### Type definitions
+
+May only appear in `.section .BTF`.
+
+`name: definition`
+
+Defines a type with the given `name`.  As well as being associated with the
+type's entry in the BTF section of the binary, the name can also be used in
+subsequent definitions.  Note, however, that a definition must precede all uses
+of the name; use [forward declarations](#forward-declarations) to get around
+this when defining e.g. self- or mutually-referential types.
+
+The type `void` is pre-defined (as `BTF_KIND_UNKN`).
+
+A `definition` consists of a `kind` followed by arguments (whose number and
+semantics depend on the `kind`).  A group of arguments enclosed by parentheses
+acts as a single argument, allowing the recursive construction of complex types.
+
+A type is _sizeable_ if its size in bytes can be calculated.  Some derived types
+require their underlying types to be _sizeable_; see below for details.
+
+#### Integers
+
+`int encoding nbits`
+
+`int (encoding encoding ...) nbits`
+
+Defines an integer type.
+
+`encoding` is one of the following flags: `signed`, `unsigned`, `char`, `bool`.
+Since `unsigned` is the default, the following definitions are equivalent:
+
+`int unsigned 32`
+
+`int () 32`
+
+As of Linux 4.19, the kernel does not accept any combination of flags (there is
+no flag bit associated with `unsigned`), but the field in the BTF structures is
+clearly intended as a bitmask.
+
+`nbits` is the number of bits in the integer.  At present the assembler only
+properly supports power-of-two sizes, as it doesn't support struct bitfields.
+
+An integer type is _sizeable_.
+
+#### Pointers
+
+`* type`
+
+Defines a type of pointer to `type`, which is either a `definition` or the
+`name` of another type defined previously.  `type` does not need to be enclosed
+in parentheses, even if it consists of multiple tokens.
+
+A pointer type is _sizeable_ even if `type` is not.
+
+#### Arrays
+
+`array type nelems`
+
+Defines a type of array of `type` with `nelems` elements.  `type` is either a
+`definition` or the `name` of another type defined previously; if it consists of
+multiple tokens, it must be parenthesised.  `nelems` is an immediate literal,
+and may be an [equate name](#equ).
+
+`type` must be _sizeable_, as is the resulting array type.
+
+#### Structures
+
+`struct (type name) [(type name) ...]`
+
+Defines a structure with members of the given types and names.  `type` is either
+a `definition` or the `name` of another type defined previously; if it consists
+of multiple tokens, it must be parenthesised.  `name` is unquoted and thus may
+contain any characters other than parens and whitespace.
+
+Each `type` must be _sizeable_, as is the resulting structure type.
+
+#### Unions
+
+`union (type name) [(type name) ...]`
+
+Defines a union with members of the given types and names.  `type` is either a
+`definition` or the `name` of another type defined previously; if it consists of
+multiple tokens, it must be parenthesised.  `name` is unquoted and thus may
+contain any characters other than parens and whitespace.
+
+Each `type` must be _sizeable_, as is the resulting structure type.
+
+#### Enumerations
+
+`enum size (name value) [(name value) ...]`
+
+Defines an enumeration of `size` bytes, with defined values of the given names
+and values.  `name` is unquoted and thus may contain any characters other than
+parens and whitespace.  `value` is an immediate literal, and may be an
+[equate name](#equ).
+
+An enumeration type is _sizeable_.
+
+#### Forward declarations
+
+`...`
+
+Defines an incomplete type.  If this is a named type, it may be overridden by a
+later redefinition of the same name; thus for instance a singly-linked list
+could be defined as:
+```
+list: ...
+list: struct ((* list) next)
+```
+
+Alternatively, the type may be left incomplete, in which case a `BTF_KIND_FWD`
+definition will be emitted.  Such a type is not _sizeable_.
+
+#### Typedefs
+
+`typedef type`
+
+Defines a type identical to `type` but with a different name.  `type` is either
+a `definition` or the `name` of another type defined previously.  `type` does
+not need to be enclosed in parentheses, even if it consists of multiple tokens.
+
+A typedef is _sizeable_ if and only if its underlying `type` is.
+
+#### Qualifiers
+
+`qualifier type`
+
+Defines a type derived from `type` but qualified according to `qualifier`.
+`type` is either a `definition` or the `name` of another type defined
+previously.  `type` does not need to be enclosed in parentheses, even if it
+consists of multiple tokens.  `qualifier` is one of `const`, `volatile` or
+`restrict`.
+
+A qualified type is _sizeable_ if and only if its underlying `type` is.
 
 ## Output format
 
