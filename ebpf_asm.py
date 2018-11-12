@@ -933,6 +933,9 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return ()
+        @classmethod
+        def from_tuple(cls, tpl):
+            raise NotImplementedError()
         @property
         def size(self):
             raise NotImplementedError()
@@ -963,6 +966,9 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name,)
+        @classmethod
+        def from_tuple(cls, tpl):
+            return cls()
     class BtfInt(BtfKind):
         name = 'int'
         kind = 1
@@ -983,6 +989,12 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.encoding, self.nbits)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.encoding = tpl[1]
+            t.nbits = tpl[2]
+            return t
         def assemble(self):
             # round up nbits/8
             self.ti = (self.nbits + 7) / 8
@@ -1008,6 +1020,11 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.ti)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.ti = tpl[1]
+            return t
         @property
         def size(self):
             return 8 # pointers are always 64 bits in eBPF
@@ -1035,6 +1052,12 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.et, self.nmemb)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.et = tpl[1]
+            t.nmemb = tpl[2]
+            return t
         @property
         def size(self):
             return self.nmemb * self.typ.size
@@ -1072,6 +1095,12 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.members)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.members = tpl[1]
+            t.vlen = len(tpl[1])
+            return t
         @property
         def size(self):
             return self.ti
@@ -1103,6 +1132,12 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.members)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.members = tpl[1]
+            t.vlen = len(tpl[1])
+            return t
         @property
         def size(self):
             return self.maxsize
@@ -1115,7 +1150,7 @@ class BtfAssembler(BaseAssembler):
             for arg in args[1:]:
                 name = arg[0]
                 value = asm.parse_immediate(arg[1])['imm']
-                self.members.append([name, value])
+                self.members.append((name, value))
             self.members = tuple(self.members)
             self.vlen = len(self.members)
         def assemble(self):
@@ -1131,6 +1166,13 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self._size, self.members)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t._size = tpl[1]
+            t.members = tpl[2]
+            t.vlen = len(tpl[2])
+            return t
         @property
         def size(self):
             return self._size
@@ -1142,6 +1184,10 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name,)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            return t
         @property
         def size(self):
             raise Exception("Tried to take size of a fwd declaration")
@@ -1154,6 +1200,11 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.ti)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.ti = tpl[1]
+            return t
         @property
         def size(self):
             return self.typ.size
@@ -1164,6 +1215,11 @@ class BtfAssembler(BaseAssembler):
         @property
         def tuple(self):
             return (self.name, self.ti)
+        @classmethod
+        def from_tuple(cls, tpl):
+            t = cls()
+            t.ti = tpl[1]
+            return t
         @property
         def size(self):
             return self.typ.size

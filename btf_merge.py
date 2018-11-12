@@ -19,7 +19,9 @@
 # SOFTWARE.
 
 import sys
+import optparse
 from ebpf_asm import BtfAssembler as BTF
+from agm import ADG
 
 def freeze_references(asm):
     # BtfAssembler stores references to member-type BTF.BtfKind()s in struct
@@ -83,8 +85,8 @@ class BtfMerger(object):
             # 'const' [1]
             # 'restrict' [1]
             t = src_types[ti]
-            if t[0] in ('pointer', 'array', 'typedef', 'volatile',
-                              'const', 'restrict'):
+            if t[0] in ('pointer', 'array', 'typedef', 'volatile', 'const',
+                        'restrict'):
                 # Single referenced type in [1]
                 refs[ti] = set([t[1]])
             elif t[0] in ('struct', 'union'):
@@ -102,7 +104,7 @@ class BtfMerger(object):
                               'const', 'restrict'):
                 if isinstance(t.tuple[1], Unresolved):
                     if isinstance(id_map.get(t.tuple[1].src_ref), int):
-                        t.tuple = (t.tuple[0], id_map[t.tuple[1].src_ref])
+                        t.tuple = (t.tuple[0], id_map[t.tuple[1].src_ref]) + t.tuple[2:]
             elif t.tuple[0] in ('struct', 'union'):
                 nm = []
                 for m in t.tuple[1]:
@@ -131,7 +133,7 @@ class BtfMerger(object):
                     # Dependencies already exist, we can just add it
                     if t[0] in ('pointer', 'array', 'typedef', 'volatile',
                                 'const', 'restrict'):
-                        new = (t[0], id_map[t[1]])
+                        new = (t[0], id_map[t[1]]) + t[2:]
                     elif t[0] in ('struct', 'union'):
                         new = (t[0], tuple((m[0], id_map[m[1]]) for m in t[1]))
                     else:
@@ -200,7 +202,7 @@ class BtfMerger(object):
                         # Doesn't already exist, let's add it (but unresolved)
                         if t[0] in ('pointer', 'array', 'typedef', 'volatile',
                                 'const', 'restrict'):
-                            new = (t[0], Unresolved(t[1]))
+                            new = (t[0], Unresolved(t[1])) + t[2:]
                         elif t[0] in ('struct', 'union'):
                             new = (t[0], tuple((m[0], Unresolved(m[1])) for m in t[1]))
                         else:
@@ -229,7 +231,7 @@ class BtfMerger(object):
                               'const', 'restrict'):
                 if isinstance(t.tuple[1], Unresolved):
                     assert t.tuple[1].src_ref in id_map, t
-                    t.tuple = (t.tuple[0], id_map[t.tuple[1].src_ref])
+                    t.tuple = (t.tuple[0], id_map[t.tuple[1].src_ref]) + t.tuple[2:]
             elif t.tuple[0] in ('struct', 'union'):
                 nm = []
                 for m in t.tuple[1]:
@@ -241,6 +243,82 @@ class BtfMerger(object):
                 t.tuple = (t.tuple[0], tuple(nm))
         print "Completed in %d passes" % (pi,)
 
+class TypeName(str):
+    def __eq__(self, other):
+        if other is None:
+            return True
+        return super(TypeName, self).__eq__(other)
+
+class AdgBtfMerger(object):
+    def __init__(self):
+        self.adg = ADG()
+    @classmethod
+    def btf_to_adg(cls, src):
+        def typ_to_anno(t):
+            # Everything about the type except for its refs if any
+            if t.tuple[0] in ('pointer', 'typedef', 'volatile', 'const',
+                              'restrict'):
+                r = t.tuple[0:1]
+            elif t.tuple[0] == 'array':
+                r = (t.tuple[0], t.tuple[2])
+            elif t.tuple[0] in ('struct', 'union'):
+                r = (t.tuple[0],) + tuple(m[0] for m in t.tuple[1])
+            elif t.tuple[0] in ('int', 'enum', 'forward', 'unknown'):
+                r = t.tuple
+            else: # No such kind!
+                assert 0, t.tuple
+            name = getattr(t, 'type_name', None)
+            if name is not None:
+                name = TypeName(name)
+            return (name,) + r
+        nodes = tuple((t, typ_to_anno(t)) for t in src.types)
+        ret = ADG(*(n[1] for n in nodes))
+        for i,(t,a) in enumerate(nodes):
+            if t.tuple[0] in ('pointer', 'array', 'typedef', 'volatile',
+                              'const', 'restrict'):
+                ret.link(i, t.tuple[1])
+            elif t.tuple[0] in ('struct', 'union'):
+                for m in t.tuple[1]:
+                    ret.link(i, m[1])
+        return ret
+    def merge(self, src):
+        sg = self.btf_to_adg(src)
+        self.adg.merge(sg)
+    @classmethod
+    def node_to_type(cls, n):
+        name = n.anno[0]
+        kind = n.anno[1]
+        if kind in BTF.btf_kinds:
+            t = BTF.btf_kinds[kind]
+        elif kind == 'pointer':
+            t = BTF.BtfPointer
+        elif kind == 'unknown':
+            t = BTF.BtfUnknown
+        elif kind == 'forward':
+            t = BTF.BtfForward
+        else: # No such kind!
+            assert 0, n
+        tpl = n.anno[1:]
+        if kind in ('pointer', 'array', 'typedef', 'volatile', 'const',
+                    'restrict'):
+            tpl = (tpl[0], n.outs[0]) + tpl[1:]
+        elif kind in ('struct', 'union'):
+            tpl = (kind, tuple(zip(tpl[1:], n.outs)))
+        t = t.from_tuple(tpl)
+        t.type_name = name
+        return t
+    @property
+    def types(self):
+        return [self.node_to_type(n) for n in self.adg.nodes]
+
+def parse_args():
+    x = optparse.OptionParser(usage='%s srcfile [...] [opts]')
+    x.add_option('--use-agm', action='store_true')
+    opts, args = x.parse_args()
+    if not args:
+        x.error('Missing srcfile(s).')
+    return opts, args
+
 if __name__ == '__main__':
     """For each file named on the command line, we parse it as a .BTF section in
     ebpf_asm's format for BTF.  We then take the resulting information (which is
@@ -248,7 +326,8 @@ if __name__ == '__main__':
     ELF) and merge all the BTF sections together.
     """
     sources = {}
-    for src in sys.argv[1:]:
+    opts, args = parse_args()
+    for src in args:
         with open(src, 'r') as srcf:
             asm = BTF({})
             cont = ''
@@ -271,8 +350,11 @@ if __name__ == '__main__':
             print "Input:", src
             print_btf_section(asm)
 
-    result = BtfMerger()
-    for src in sys.argv[1:]:
+    if opts.use_agm:
+        result = AdgBtfMerger()
+    else:
+        result = BtfMerger()
+    for src in args:
         print "Merging", src
         result.merge(sources[src])
     print "Result:"
