@@ -1560,8 +1560,8 @@ class ElfGenerator(object):
                            self.get_section('.strtab').idx)
 
 def parse_args():
-    x = optparse.OptionParser(usage='%s srcfile [...] -o outfile',
-                              version='%prog ' + VERSION if VERSION else None)
+    x = optparse.OptionParser(usage='%prog srcfile [...] -o outfile',
+                              version='%prog ' + (VERSION if VERSION else '(dev)'))
     x.add_option('-o', '--output', type='string', default='a.out')
     x.add_option('--no-pin-maps', action='store_true')
     opts, args = x.parse_args()
