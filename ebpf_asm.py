@@ -1283,7 +1283,7 @@ class BtfAssembler(BaseAssembler):
         return {}
 
 class Assembler(BaseAssembler):
-    def __init__(self, no_pin):
+    def __init__(self, no_pin=False):
         super(Assembler, self).__init__({})
         self.no_pin = no_pin
         self.sections = {}
