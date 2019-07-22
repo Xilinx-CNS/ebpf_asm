@@ -81,6 +81,17 @@ the equate in a context where a size suffix would be allowed will require using
 An equate can be redefined; the new value takes effect from the following line.
 This could also be confusing, so maybe you shouldn't do it.
 
+#### .globl
+
+`.globl name` specifies that the label `name:` should create a global, rather
+ than local, symbol; it is only needed for labels in text, not data, sections.
+
+The scope of the directive is the containing section; a .globl in one section
+ does not affect similar labels in other sections.
+
+A warning will be written to stderr for any `.globl` whose referenced label does
+ not exist, or for any `.globl` appearing in a non-text section.
+
 ### Labels
 
 A label consists of a sequence of alphanumeric characters followed by a colon
@@ -93,6 +104,10 @@ A label consists of a sequence of alphanumeric characters followed by a colon
 
 Note that code cannot appear on the same line as the label!  This is something
  we probably ought to support, but currently don't.
+
+Labels appear as symbols in the output binary; by default labels in .text are
+ local whereas those in .data or maps sections are global.  Global labels in
+ .text sections can be created with the [.globl directive](#.globl).
 
 ### Instructions
 

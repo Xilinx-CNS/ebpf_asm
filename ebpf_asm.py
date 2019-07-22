@@ -24,6 +24,7 @@ import struct
 import ast
 import optparse
 import math
+import sys
 
 import paren
 
@@ -127,6 +128,7 @@ Register names: r0-r10, fp (== r10)
 class BaseAssembler(object):
     def __init__(self, equates):
         self.equates = equates
+        self.globls = set()
     _size_re = re.compile(r'\.([bwlq])$')
     _octal_re = re.compile(r'0\d+$')
     _decimal_re = re.compile(r'\d+$')
@@ -1334,6 +1336,13 @@ class Assembler(BaseAssembler):
             raise Exception('Bad .equ name', name)
         val = self.parse_immediate(val)['imm']
         self.equates[name] = val
+    def do_globl(self, args):
+        if len(args) != 1:
+            raise Exception("Bad .globl, expected 1 arg, got", args)
+        name = args[0]
+        if self.section is None:
+            raise Exception("Not in a section at", line)
+        self.sections[self.section].globls.add(name)
     def feed_line(self, line):
         # handle continuation lines
         line = self.cont + line.rstrip('\n')
@@ -1413,6 +1422,8 @@ class ElfGenerator(object):
         self.gen_shtbl()
         self.ehdr = self.elf_header()
         assert len(self.ehdr) == 64, (len(self.ehdr), repr(self.ehdr))
+    def warn(self, *args):
+        sys.stderr.write("Warning: " + ' '.join(map(str, args)) + '\n')
     @property
     def binary(self):
         sectext = ''
@@ -1453,7 +1464,7 @@ class ElfGenerator(object):
     def gen_symtab(self):
         self.symtab = ''
         self.symbols = {}
-        # LOCAL symbols (from .text sections)
+        # .text symbols (LOCAL unless .globl)
         self.add_symbol('', False, 0, 0)
         for section, sec in self.asm.sections.iteritems():
             s = self.get_section(section)
@@ -1462,9 +1473,12 @@ class ElfGenerator(object):
             if not isinstance(sec, ProgAssembler):
                 continue
             for sym in sec.symbols:
-                self.add_symbol(sym, True, s.idx, sec.symbols[sym])
+                self.add_symbol(sym, sym in sec.globls, s.idx, sec.symbols[sym])
+            for sym in sec.globls:
+                if sym not in sec.symbols:
+                    self.warn(".globl of nonexistent symbol", sym, "in section", s.name)
         self.locals = len(self.symbols)
-        # GLOBAL symbols (from .data or maps sections)
+        # .data or maps symbols (GLOBAL)
         for section, sec in self.asm.sections.iteritems():
             s = self.get_section(section)
             if s is None:
@@ -1473,6 +1487,8 @@ class ElfGenerator(object):
                 continue
             for sym in sec.symbols:
                 self.add_symbol(sym, True, s.idx, sec.symbols[sym])
+            for sym in sec.globls:
+                self.warn("unnecessary .globl", sym, "in section", s.name)
     def gen_relocs(self, relocs):
         def gen_reloc(k, v):
             return struct.pack('<QII', k * 8, 1, self.symbols[v])
