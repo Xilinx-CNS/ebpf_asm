@@ -12,4 +12,4 @@ mkdir "$reld"
 
 sed -e "/VERSION =/cVERSION = '$vers'" < ebpf_asm.py > "$reld/ebpf_asm.py"
 chmod +x "$reld/ebpf_asm.py"
-cp README.md *.i regression.py "$reld/"
+cp README.md *.i regression.py paren.py "$reld/"
