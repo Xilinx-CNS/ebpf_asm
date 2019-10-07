@@ -1284,9 +1284,10 @@ class BtfAssembler(BaseAssembler):
         return {}
 
 class Assembler(BaseAssembler):
-    def __init__(self, no_pin=False):
+    def __init__(self, no_pin=False, allow_undef=False):
         super(Assembler, self).__init__({})
         self.no_pin = no_pin
+        self.allow_undef = allow_undef
         self.sections = {}
         self.section = None
         self.sectype = None
@@ -1479,6 +1480,8 @@ class ElfGenerator(object):
                 self.add_symbol(sym, sym in sec.globls, s.idx, sec.symbols[sym])
             for sym in sec.globls:
                 if sym not in sec.symbols:
+                    if not self.asm.allow_undef:
+                        raise Exception("Undefined .globl declared", sym)
                     self.add_string(sym)
                     self.add_symbol(sym, True, 0, 0) # secidx=SHN_UNDEF
         self.locals = len(self.symbols)
@@ -1568,6 +1571,7 @@ def parse_args():
                               version='%prog ' + (VERSION if VERSION else '(dev)'))
     x.add_option('-o', '--output', type='string', default='a.out')
     x.add_option('--no-pin-maps', action='store_true')
+    x.add_option('-c', '--allow-undef', action='store_true')
     opts, args = x.parse_args()
     if not args:
         x.error('Missing srcfile(s).')
@@ -1575,7 +1579,7 @@ def parse_args():
 
 if __name__ == '__main__':
     opts, args = parse_args()
-    asm = Assembler(opts.no_pin_maps)
+    asm = Assembler(opts.no_pin_maps, opts.allow_undef)
     for src in args:
         with open(src, 'r') as srcf:
             for line in srcf:
