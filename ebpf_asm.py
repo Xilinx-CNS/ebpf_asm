@@ -1537,7 +1537,7 @@ class ElfGenerator(object):
         #   u8  abi_ver; // 0
         #   u8  padding[7];
         #   u16 type; // 1: relocatable
-        #   u16 machine; // 0x7f: eBPF
+        #   u16 machine; // 0xf7: eBPF
         #   u32 version; // 1
         #   u64 entry;
         #   u64 phoff;
