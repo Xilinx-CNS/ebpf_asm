@@ -208,7 +208,8 @@ class ProgAssembler(BaseAssembler):
                 nrelocs[index] = symbol
                 continue
             if symbol not in self.symbols:
-                raise Exception("Undefined symbol", symbol)
+                nrelocs[index] = symbol
+                continue
             offset = self.symbols[symbol] - index
             op, regs, off, imm = struct.unpack('<BBhi', self.section[index])
             imm += offset
@@ -1438,6 +1439,8 @@ class ElfGenerator(object):
                 return sec
         return None
     def add_string(self, string):
+        if string in self.strings:
+            return
         self.strings[string] = len(self.strtab)
         self.strtab += string + '\0'
     def gen_strtab(self):
@@ -1476,7 +1479,8 @@ class ElfGenerator(object):
                 self.add_symbol(sym, sym in sec.globls, s.idx, sec.symbols[sym])
             for sym in sec.globls:
                 if sym not in sec.symbols:
-                    self.warn(".globl of nonexistent symbol", sym, "in section", s.name)
+                    self.add_string(sym)
+                    self.add_symbol(sym, True, 0, 0) # secidx=SHN_UNDEF
         self.locals = len(self.symbols)
         # .data or maps symbols (GLOBAL)
         for section, sec in self.asm.sections.iteritems():
