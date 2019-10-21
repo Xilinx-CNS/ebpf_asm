@@ -11,11 +11,11 @@ A static linker for eBPF programs.
 With the increasingly wide usage of eBPF comes the need to allow multiple
 applications to attach programs to the same hook.  While there exist tail-call
 based schemes to chain co-operating programs, these require modification of the
-program source, and tail calls are problematic in various ways.  One proposal[1]
-is for the kernel directly to support chaining programs, but this then requires
-a declarative specification of how each program's return code should affect
-which program is run next, and how the final return code is determined (e.g. for
-XDP, should the packet be passed, dropped or redirected?).
+program source, and tail calls are problematic in various ways.
+[One proposal][1] is for the kernel directly to support chaining programs, but
+this then requires a declarative specification of how each program's return code
+should affect which program is run next, and how the final return code is
+determined (e.g. for XDP, should the packet be passed, dropped or redirected?).
 
 [1]: https://lore.kernel.org/netdev/20191009121955.29cad5bb@carbon/T/
 
