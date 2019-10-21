@@ -11,5 +11,6 @@ reld="ebpf_asm-$vers"
 mkdir "$reld"
 
 sed -e "/VERSION =/cVERSION = '$vers'" < ebpf_asm.py > "$reld/ebpf_asm.py"
-chmod +x "$reld/ebpf_asm.py"
-cp README.md *.i regression.py paren.py "$reld/"
+sed -e "/VERSION =/cVERSION = '$vers'" < ebld.py > "$reld/ebld.py"
+chmod +x "$reld/ebpf_asm.py" "$reld/ebld.py"
+cp README.md *.i regression.py paren.py README_ebld.md ebld.py elves.py "$reld/"
