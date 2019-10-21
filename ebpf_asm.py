@@ -208,6 +208,8 @@ class ProgAssembler(BaseAssembler):
                 nrelocs[index] = symbol
                 continue
             if symbol not in self.symbols:
+                if symbol not in self.globls:
+                    raise Exception("Undefined symbol", symbol)
                 nrelocs[index] = symbol
                 continue
             offset = self.symbols[symbol] - index
