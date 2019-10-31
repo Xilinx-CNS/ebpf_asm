@@ -233,7 +233,10 @@ immediate).  There are multiple synonyms for each condition.
 * `set`, `&`, `and`: Jump if the bitwise AND of `dst` and `src` is nonzero.
 
 Both `dst` and `src` registers are considered as quads (`.q`); a `src` immediate
-is considered a long (`.l`).  Explicit size suffixes are not accepted.
+is considered a long (`.l`).  Explicit size suffixes are not accepted; the
+instruction encoding for jumps only supports these sizes (note in particular
+that although the comparison is performed on 64-bit values, the immediate is
+still limited to (signed) 32 bits).
 
 #### call
 
