@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#! /usr/bin/env python
 # Copyright (c) 2017-2018 Solarflare Communications Ltd
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,11 @@
 # SOFTWARE.
 
 
+from __future__ import division
+from builtins import map
+from builtins import range
+from builtins import object
+from builtins import bytes
 import re
 import struct
 import ast
@@ -216,7 +221,7 @@ class ProgAssembler(BaseAssembler):
         self.relocs = nrelocs
     @property
     def binary(self):
-        return ''.join(self.section)
+        return b''.join(self.section)
     @property
     def length(self):
         return len(self.binary)
@@ -241,7 +246,7 @@ class ProgAssembler(BaseAssembler):
                 d['reg'] = 10
             else:
                 d['reg'] = int(m.group(1), 10)
-                if d['reg'] not in range(11):
+                if d['reg'] not in list(range(11)):
                     raise Exception("Bad register", operand)
             return d
         try:
@@ -297,7 +302,7 @@ class ProgAssembler(BaseAssembler):
         """ld dest, src"""
         if len(args) != 2:
             raise Exception("Bad ld, expected 2 args, got", args)
-        dst, src = map(self.parse_operand, args)
+        dst, src = list(map(self.parse_operand, args))
         return {'op': 'ld', 'dst': dst, 'src': src}
 
     def parse_ldpkt(self, op, args):
@@ -320,7 +325,7 @@ class ProgAssembler(BaseAssembler):
         """op dest, src"""
         if len(args) != 2:
             raise Exception("Bad %s, expected 2 args, got"%(op,), args)
-        dst, src = map(self.parse_direct_operand, args)
+        dst, src = list(map(self.parse_direct_operand, args))
         return {'op': op, 'dst': dst, 'src': src}
 
     def parse_neg(self, op, args):
@@ -376,7 +381,7 @@ class ProgAssembler(BaseAssembler):
         cc = args[0]
         if cc not in self.jr_conds:
             raise Exception("Bad jump op", cc)
-        dst, src = map(self.parse_direct_operand, args[1:3])
+        dst, src = list(map(self.parse_direct_operand, args[1:3]))
         if 'size' in dst: # compares always use full quad size
             raise Exception("Bad size in jump dst", args[1])
         if 'size' in src: # compares always use full quad size
@@ -444,7 +449,7 @@ class ProgAssembler(BaseAssembler):
         op, args = self.parse_op_args(line)
         if op not in self.op_parsers:
             raise Exception("Unrecognised instruction", line)
-        args = map(str.strip, args.split(','))
+        args = list(map(str.strip, args.split(',')))
         if args == ['']:
             args = []
         d = self.op_parsers[op](self, op, args)
@@ -676,17 +681,17 @@ class ProgAssembler(BaseAssembler):
     BPF_X = 8
 
     def check_s16(self, imm):
-        if imm > 0x7fff or imm < -0x8000:
+        if not isinstance(imm, int) or imm > 0x7fff or imm < -0x8000:
             raise Exception("Value out of range for s16", imm)
         return imm
 
     def check_s32(self, imm):
-        if imm > 0x7fffffff or imm < -0x80000000:
+        if not isinstance(imm, int) or imm > 0x7fffffff or imm < -0x80000000:
             raise Exception("Value out of range for s32", imm)
         return imm
 
     def check_u64(self, imm):
-        if imm >= (1 << 64) or imm < 0:
+        if not isinstance(imm, int) or imm >= (1 << 64) or imm < 0:
             raise Exception("Value out of range for u64", imm)
         return imm
 
@@ -739,7 +744,7 @@ class ProgAssembler(BaseAssembler):
     def assemble_jmp(self, insn):
         # class, op, dest, {x, src | k, imm}, off
         off = insn.get('off', 0)
-        if isinstance(off, (int, long)):
+        if not isinstance(off, str):
             self.check_s16(off)
         if insn['op'] == 'call':
             op = self.classes[insn['class']] | self.jmp_ops[insn['op']]
@@ -849,20 +854,20 @@ class MapsAssembler(BaseAssembler):
                                d['max_entries'], d['flags'], 0, 2)
     def feed_line(self, line):
         name, _, args = line.strip().partition(': ')
-        args = map(str.strip, args.split(','))
+        args = list(map(str.strip, args.split(',')))
         if name in self.maps:
             raise Exception("Duplicate map", name)
         d = self.parse_map(args)
         self.maps[name] = self.assemble_map(d)
     def resolve_symbols(self):
-        self.section = ''
+        self.section = b''
         self.symbols = {}
-        for k, v in self.maps.iteritems():
+        for k, v in self.maps.items():
             self.symbols[k] = len(self.section)
             self.section += v
     @property
     def binary(self):
-        return ''.join(self.section)
+        return self.section
     @property
     def length(self):
         return len(self.binary)
@@ -874,7 +879,7 @@ class DataAssembler(BaseAssembler):
     elf_flags = 'WA'
     def __init__(self, equates):
         super(DataAssembler, self).__init__(equates)
-        self.section = ''
+        self.section = b''
         self.symbols = {}
     def feed_line(self, line):
         m = self._label_re.match(line)
@@ -887,10 +892,18 @@ class DataAssembler(BaseAssembler):
         else:
             raise Exception("No such .data insn", op)
     def do_asciz(self, args):
-        string = ast.literal_eval(args.strip())
+        try:
+            string = ast.literal_eval(args.strip())
+        except SyntaxError as e:
+            if str(e).startswith("unterminated string literal"):
+                raise SyntaxError("EOL while scanning string literal")
+            elif str(e).startswith("invalid syntax"):
+                raise SyntaxError("unexpected EOF while parsing")
+            raise e
         if not isinstance(string, str):
             raise Exception("asciz takes a string, not", args)
-        self.section += string + '\0'
+        string = bytes(string, "ascii")
+        self.section += string + b'\0'
     def resolve_symbols(self):
         pass # nothing to do
     @property
@@ -961,7 +974,7 @@ class BtfAssembler(BaseAssembler):
         name = 'unknown'
         kind = 0
         def assemble(self):
-            return ''
+            return b''
         @property
         def tuple(self):
             return (self.name,)
@@ -987,7 +1000,7 @@ class BtfAssembler(BaseAssembler):
             return (self.name, self.encoding, self.nbits)
         def assemble(self):
             # round up nbits/8
-            self.ti = (self.nbits + 7) / 8
+            self.ti = (self.nbits + 7) // 8
             hdr = super(BtfAssembler.BtfInt, self).assemble()
             #define BTF_INT_ENCODING(VAL)	(((VAL) & 0x0f000000) >> 24)
             #define BTF_INT_OFFSET(VAL)	    (((VAL  & 0x00ff0000)) >> 16)
@@ -1061,7 +1074,7 @@ class BtfAssembler(BaseAssembler):
                 memb.append(bits_offset)
                 bits_offset += memb[2].size_bits
             # Size in bytes (round up)
-            self.ti = (bits_offset + 7) / 8
+            self.ti = (bits_offset + 7) // 8
             hdr = super(BtfAssembler.BtfStruct, self).assemble()
             for memb in self.members:
                 """struct btf_member {
@@ -1239,17 +1252,19 @@ class BtfAssembler(BaseAssembler):
     def resolve_symbols(self):
         self.offsets = [0]
         self.symbols = {}
-        types = ''
-        names = '\0'
+        types = b''
+        names = b'\0'
         for t in self.types:
             if t.members:
                 for m in t.members:
                     n, m[0] = m[0], len(names)
-                    names += n + '\0'
-        for k, ti in self.named_types.iteritems():
+                    n = bytes(n, "ascii")
+                    names += n + b'\0'
+        for k, ti in self.named_types.items():
             t = self.types[ti]
             t.name_offset = len(names)
-            names += k + '\0'
+            k = bytes(k, "ascii")
+            names += k + b'\0'
         for t in self.types:
             self.offsets.append(len(types))
             types += t.assemble()
@@ -1274,7 +1289,7 @@ class BtfAssembler(BaseAssembler):
         #print repr(names)
     @property
     def binary(self):
-        return ''.join(self.section)
+        return self.section
     @property
     def length(self):
         return len(self.binary)
@@ -1355,7 +1370,7 @@ class Assembler(BaseAssembler):
             line, _, _ = line.partition(';')
         if line.startswith('.'):
             d, args = op, args = self.parse_op_args(line[1:])
-            args = map(str.strip, args.split(','))
+            args = list(map(str.strip, args.split(',')))
             if args == ['']:
                 args = []
             self.directive(d, args)
@@ -1366,7 +1381,7 @@ class Assembler(BaseAssembler):
             raise Exception("Not in a section at", line)
         self.sections[self.section].feed_line(line)
     def resolve_symbols(self):
-        for sec in self.sections.values():
+        for sec in list(self.sections.values()):
             sec.resolve_symbols()
 
 class ElfSection(object):
@@ -1379,8 +1394,8 @@ class ElfSection(object):
             raise Exception("Unhandled ElfSection type", typ)
         self.typ_i = self.types[typ]
         self.entsize = self.entsizes.get(typ, 0)
-        self.name = name
-        self.text = ''
+        self.name = bytes(name, "ascii")
+        self.text = b''
         flagv = 0
         for flag in flags:
             if flag not in self.flag_bits:
@@ -1399,7 +1414,7 @@ class ElfGenerator(object):
                          ElfSection('strtab', '.strtab'),
                          ElfSection('progbits', '.text'),
                          ]
-        for section, sec in self.asm.sections.iteritems():
+        for section, sec in self.asm.sections.items():
             idx = len(self.sections)
             self.sections.append(ElfSection('progbits', section, sec.elf_flags))
             if sec.relocs:
@@ -1412,7 +1427,7 @@ class ElfGenerator(object):
         self.gen_symtab()
         self.get_section('.strtab').text = self.strtab
         self.get_section('.symtab').text = self.symtab
-        for section, sec in self.asm.sections.iteritems():
+        for section, sec in self.asm.sections.items():
             s = self.get_section(section)
             s.text = sec.binary
             if sec.relocs:
@@ -1426,26 +1441,30 @@ class ElfGenerator(object):
         sys.stderr.write("Warning: " + ' '.join(map(str, args)) + '\n')
     @property
     def binary(self):
-        sectext = ''
+        sectext = b''
         for sec in self.sections:
             sectext += sec.text
             if sec.len % 8:
-                sectext += '\0' * (8 - (sec.len % 8))
+                sectext += b'\0' * (8 - (sec.len % 8))
         return self.ehdr + sectext + self.shtbl
     def get_section(self, name):
+        if isinstance(name, str):
+            name = bytes(name, "ascii")
         for sec in self.sections:
             if sec.name == name:
                 return sec
         return None
     def add_string(self, string):
+        if isinstance(string, str):
+            string = bytes(string, "ascii")
         self.strings[string] = len(self.strtab)
-        self.strtab += string + '\0'
+        self.strtab += string + b'\0'
     def gen_strtab(self):
-        self.strtab = ''
+        self.strtab = b''
         self.strings = {}
         for sec in self.sections:
             self.add_string(sec.name)
-        for sec in self.asm.sections.values():
+        for sec in list(self.asm.sections.values()):
             for sym in sec.symbols:
                 self.add_string(sym)
     def add_symbol(self, name, globl, secidx, value):
@@ -1457,16 +1476,18 @@ class ElfGenerator(object):
         #   u64 st_value;
         #   u64 st_size; // 0
         #};
+        if isinstance(name, str):
+            name = bytes(name, "ascii")
         self.symbols[name] = len(self.symbols)
         stridx = self.strings[name]
         self.symtab += struct.pack('<IBBHQQ', stridx, 16 if globl else 0, 0,
                                    secidx, value, 0)
     def gen_symtab(self):
-        self.symtab = ''
+        self.symtab = b''
         self.symbols = {}
         # .text symbols (LOCAL unless .globl)
         self.add_symbol('', False, 0, 0)
-        for section, sec in self.asm.sections.iteritems():
+        for section, sec in self.asm.sections.items():
             s = self.get_section(section)
             if s is None:
                 raise Exception("Couldn't find ELF section", section)
@@ -1479,7 +1500,7 @@ class ElfGenerator(object):
                     self.warn(".globl of nonexistent symbol", sym, "in section", s.name)
         self.locals = len(self.symbols)
         # .data or maps symbols (GLOBAL)
-        for section, sec in self.asm.sections.iteritems():
+        for section, sec in self.asm.sections.items():
             s = self.get_section(section)
             if s is None:
                 raise Exception("Couldn't find ELF section", section)
@@ -1491,8 +1512,10 @@ class ElfGenerator(object):
                 self.warn("unnecessary .globl", sym, "in section", s.name)
     def gen_relocs(self, relocs):
         def gen_reloc(k, v):
+            if isinstance(v, str):
+                v = bytes(v, "ascii")
             return struct.pack('<QII', k * 8, 1, self.symbols[v])
-        return ''.join(gen_reloc(k, v) for k,v in relocs.iteritems())
+        return b''.join(gen_reloc(k, v) for k,v in relocs.items())
     def gen_offsets(self):
         self.shoff = 0x40 # sizeof(struct elf_header)
         for sec in self.sections:
@@ -1501,7 +1524,7 @@ class ElfGenerator(object):
             if self.shoff % 8:
                 self.shoff = (self.shoff + 7) & ~7
     def gen_shtbl(self):
-        self.shtbl = ''
+        self.shtbl = b''
         # struct elf_shdr {
         #   u32 sh_name;
         #   u32 sh_type;
