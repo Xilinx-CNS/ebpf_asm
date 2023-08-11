@@ -1,9 +1,14 @@
-#!/usr/bin/python2
+#! /usr/bin/env python
 # Copyright (c) 2017 Solarflare Communications Ltd
 # Provided under the MIT license; see top of ebpf_asm.py for details
 
 # Regression tests for ebpf_asm
 
+from __future__ import print_function
+from builtins import map
+from builtins import str
+from builtins import range
+from builtins import object
 import ebpf_asm as asm
 import difflib
 import struct
@@ -31,12 +36,12 @@ class AcceptTestMixin(object):
                                                     group[-1][4] - group[0][3]))
                 for o, ai, aj, bi, bj in group:
                     if o == 'equal':
-                        for a in xrange(ai, aj):
+                        for a in range(ai, aj):
                             delta.append('  ' + str(self.out[a]))
                     else:
-                        for a in xrange(ai, aj):
+                        for a in range(ai, aj):
                             delta.append('- ' + str(self.out[a]))
-                        for b in xrange(bi, bj):
+                        for b in range(bi, bj):
                             delta.append('+ ' + str(self.prog_dis[b]))
             raise TestFailure("%s failed:\n%s" % (self.name, '\n'.join(delta)))
 
@@ -80,7 +85,7 @@ class BaseAsmTest(object):
         self.prog_bin = self.asm.sections['prog'].binary
     def dump(self):
         self.prog_dis = []
-        for i in xrange(0, len(self.prog_bin), 8):
+        for i in range(0, len(self.prog_bin), 8):
             op, regs, off, imm = struct.unpack('<BBhi', self.prog_bin[i:i+8])
             dst = regs & 0xf
             src = regs >> 4
@@ -109,7 +114,7 @@ class BaseDataTest(object):
         self.prog_bin = self.asm.sections['data'].binary
     def dump(self):
         # TODO teach this to return offsets & symbols
-        self.prog_dis = self.prog_bin.split('\0')
+        self.prog_dis = self.prog_bin.split(b'\0')
 
 class DataTest(BaseDataTest, AcceptTestMixin): pass
 class BadDataTest(BaseDataTest, RejectTestMixin): pass
@@ -566,7 +571,7 @@ AllTests = [
         asciz "foo"
         asciz 'ba"r'
         asciz '''quu'x'''
-    """, ['foo', 'ba"r', "quu'x", '']),
+    """, [b'foo', b'ba"r', b"quu'x", b'']),
 
     ## ASSEMBLER DIRECTIVES
 
@@ -655,10 +660,10 @@ def run_testset(tests, verbose=False):
         try:
             test.run()
             if verbose:
-                print "%03d %s PASS" % (i, test)
+                print("%03d %s PASS" % (i, test))
             passes += 1
         except Exception as e:
-            print "%03d %s FAIL %s" % (i, test, e)
+            print("%03d %s FAIL %s" % (i, test, e))
             fails += 1
     return passes, fails
 
@@ -667,6 +672,6 @@ if __name__ == '__main__':
     verbose = '-v' in sys.argv[1:]
     passes, fails = run_testset(AllTests, verbose=verbose)
     if verbose:
-        print "DONE; %d PASS, %d FAIL" % (passes, fails)
+        print("DONE; %d PASS, %d FAIL" % (passes, fails))
     if fails or not passes:
         sys.exit(1)
